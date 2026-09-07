@@ -34,10 +34,18 @@ pnpm install
 pnpm dev
 ```
 
-Two env files, deliberately: `.env` holds only the two `NEXT_PUBLIC_` values,
-because Next compiles everything in it into the bundle — including the deployed
-Worker. Tooling secrets go in `.env.tooling`, which Next never reads. Both are
-gitignored.
+Three env files, deliberately:
+
+| File | Read by Next | Committed | Holds |
+| --- | :---: | :---: | --- |
+| `.env.production` | yes | **yes** | The two `NEXT_PUBLIC_` values, so every build has them |
+| `.env` | yes | no | Local overrides, e.g. pointing at a different project |
+| `.env.tooling` | no | no | Access tokens and other real secrets |
+
+Next compiles everything it reads into the bundle, including the deployed
+Worker — so anything in the first two ships to the browser. That is fine for the
+`NEXT_PUBLIC_` pair (the anon key is RLS-scoped and public by design) and fatal
+for anything else, which is why tooling secrets are in a file Next never opens.
 
 **4. Create the first account.** Open <http://localhost:3000>, choose *Create an
 account*. The first person to sign up becomes the **admin** — everyone after
@@ -139,10 +147,18 @@ npx wrangler deploy   # needs CLOUDFLARE_API_TOKEN in .env.tooling
 ```
 
 Through Workers Builds instead, set the **build command** to `pnpm run cf:build`
-(plain `next build` does not produce `.open-next/`), and set both
-`NEXT_PUBLIC_` values as **build** variables under Settings → Build. Runtime
-variables do not work: these are compiled in when the build runs, so setting
-them afterwards changes nothing without a rebuild.
+— plain `next build` does not produce `.open-next/`. Nothing else needs
+configuring: the `NEXT_PUBLIC_` values come from the committed
+`.env.production`.
+
+Do not move them into dashboard variables. They are compiled in when the build
+runs, so a *runtime* variable arrives too late to have any effect, and a *build*
+variable reintroduces a hand-typed name that fails silently — one missing letter
+builds green and serves 503 on every page. If a deploy target genuinely needs
+different values, a real environment variable still overrides the file.
+
+`wrangler deploy` also replaces the Worker's configuration with `wrangler.jsonc`,
+so any variable added in the dashboard is deleted on the next deploy.
 
 Then add the deployed URL to Supabase under Authentication → URL Configuration.
 
