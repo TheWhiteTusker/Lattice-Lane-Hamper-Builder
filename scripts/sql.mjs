@@ -13,7 +13,13 @@ import path from "node:path";
 
 const ROOT = path.resolve(import.meta.dirname, "..");
 
-const raw = await readFile(path.join(ROOT, ".env"), "utf8").catch(() => "");
+const raw = (
+  await Promise.all(
+    [".env", ".env.tooling"].map((f) =>
+      readFile(path.join(ROOT, f), "utf8").catch(() => ""),
+    ),
+  )
+).join("\n");
 const env = { ...process.env };
 for (const line of raw.split("\n")) {
   const m = line.match(/^\s*([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)\s*$/);

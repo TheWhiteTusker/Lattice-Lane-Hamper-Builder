@@ -50,3 +50,9 @@ next-env.d.ts
 # Cloudflare Workers build output
 .open-next/
 .wrangler/
+
+# Local-only pnpm layout override for Windows symlink limits.
+.npmrc
+
+# Tooling secrets, never read by Next.
+.env.tooling
