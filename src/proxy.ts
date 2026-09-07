@@ -1,19 +1,36 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+import { supabaseEnv, SupabaseConfigError } from "@/lib/supabase/env";
 
 /**
-* Refreshes the auth session on every request and keeps signed-out users out
+ * Refreshes the auth session on every request and keeps signed-out users out
  * of the app. Pages still call requireUser(); this just avoids rendering them
  * at all, and stops the session cookie from expiring mid-session.
  */
 export async function proxy(request: NextRequest) {
   let response = NextResponse.next({ request });
 
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
+  // This runs on every request, so a missing build-time variable takes down
+  // the whole site rather than one route. Answer with something that says so:
+  // the detail goes to the logs, not to whoever is looking at the page.
+  let url: string;
+  let key: string;
+
+  try {
+    ({ url, key } = supabaseEnv());
+  } catch (error) {
+    if (error instanceof SupabaseConfigError) {
+      console.error(error.message);
+      return new NextResponse("This deployment is missing its configuration.", {
+        status: 503,
+        headers: { "content-type": "text/plain; charset=utf-8" },
+      });
+    }
+    throw error;
+  }
+
+  const supabase = createServerClient(url, key, {
+    cookies: {
         getAll: () => request.cookies.getAll(),
         setAll(cookiesToSet) {
           for (const { name, value } of cookiesToSet) {
@@ -24,9 +41,8 @@ export async function proxy(request: NextRequest) {
             response.cookies.set(name, value, options);
           }
         },
-      },
     },
-  );
+  });
 
   const {
     data: { user },
