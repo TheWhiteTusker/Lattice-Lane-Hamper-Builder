@@ -16,8 +16,13 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
+    // Browser extensions add their own attributes to <html> before React
+    // hydrates (data-cms-frame-unlock, data-lt-installed and friends), which
+    // React reports as a mismatch. This suppresses that for this element's own
+    // attributes only — mismatches inside the tree are still reported.
     <html
       lang="en"
+      suppressHydrationWarning
       className={`${cabin.variable} ${figtree.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col font-[family-name:var(--font-figtree)]">
