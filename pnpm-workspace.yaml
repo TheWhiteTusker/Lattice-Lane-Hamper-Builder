@@ -1,14 +1,21 @@
-# Single-package repo. This file exists only to allow one build script, but
-# pnpm 10 treats any pnpm-workspace.yaml as a workspace root and refuses to
-# install without a packages field ("packages field missing or empty"), so it
-# is declared explicitly.
+# Single-package repo. This file exists only to allow build scripts, but pnpm 10
+# treats any pnpm-workspace.yaml as a workspace root and refuses to install
+# without a packages field ("packages field missing or empty"), so it is
+# declared explicitly.
 packages:
   - .
 
-# unrs-resolver ships a native binary and needs its postinstall to run. It
-# arrives via eslint-config-next. pnpm renamed this setting between majors, so
-# both spellings are present: whichever pnpm runs, one of them applies.
+# These ship native binaries and need their postinstall to run:
+#   unrs-resolver  via eslint-config-next
+#   esbuild        via @opennextjs/cloudflare
+#   workerd        the Cloudflare Workers runtime, via wrangler
+# pnpm renamed this setting between majors, so both spellings are present and
+# whichever pnpm runs will find one of them.
 onlyBuiltDependencies: # pnpm 10
   - unrs-resolver
+  - esbuild
+  - workerd
 allowBuilds: # pnpm 11
   unrs-resolver: true
+  esbuild: true
+  workerd: true

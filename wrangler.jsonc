@@ -1,0 +1,23 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "lattice-lane-hamper-builder",
+
+  // Built by `opennextjs-cloudflare build`, which turns .next into a Worker.
+  // Deploying .next directly does not work, which is why wrangler kept trying
+  // to migrate the project on every build.
+  "main": ".open-next/worker.js",
+
+  "compatibility_date": "2026-09-03",
+
+  // Required by OpenNext and by @supabase/ssr, both of which use node: builtins.
+  "compatibility_flags": ["nodejs_compat"],
+
+  "assets": {
+    "directory": ".open-next/assets",
+    "binding": "ASSETS"
+  },
+
+  "observability": {
+    "enabled": true
+  }
+}
