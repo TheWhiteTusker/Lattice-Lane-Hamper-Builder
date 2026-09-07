@@ -42,3 +42,7 @@ next-env.d.ts
 
 # keep the template committed
 !.env.local.example
+
+# Skill symlinks point at absolute local paths, so they are per-machine.
+# The skills themselves live in .agents/ and are committed.
+.claude/
