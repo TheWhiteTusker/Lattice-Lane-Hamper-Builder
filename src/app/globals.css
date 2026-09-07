@@ -1,15 +1,32 @@
 @import "tailwindcss";
 
+/* Palette taken from latticelane.com's own Shopify colour schemes:
+   cream #faf8ee, sage #54655b, soft gold #ddcf8b, deep green #2c332f.
+
+   One deliberate departure: the site sets body copy in sage on cream, which
+   reads well over marketing prose but not over a screen of numbers. Primary
+   text here is the deeper green, with sage kept for secondary text — same
+   family, enough contrast to work in a dense table. */
 @theme {
-  --color-ink: #16130f;
-  --color-muted: #6b6257;
-  --color-line: #e5ded4;
-  --color-paper: #faf8f5;
-  --color-brand: #7c5c3e;
-  --color-brand-dark: #5d452e;
-  --color-brand-soft: #f2ebe2;
-  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --color-ink: #2c332f;
+  --color-muted: #54655b;
+  --color-line: #e3ddcc;
+  --color-paper: #faf8ee;
+  --color-brand: #54655b;
+  --color-brand-dark: #2c332f;
+  --color-brand-soft: #f1ebe0;
+  --color-gold: #ddcf8b;
+  --font-sans: var(--font-figtree), ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font-cabin), var(--font-figtree), ui-sans-serif, sans-serif;
   --font-mono: var(--font-geist-mono), ui-monospace, monospace;
+}
+
+/* Headings are Cabin, body is Figtree — the two families the storefront uses. */
+h1,
+h2,
+h3,
+.font-display {
+  font-family: var(--font-display);
 }
 
 body {
@@ -28,9 +45,12 @@ body {
     @apply block text-[11px] font-medium uppercase tracking-wide text-[var(--color-muted)];
   }
 
+  /* The storefront rounds inputs to 20px, which on a 32px-tall field in a
+     ten-column grid becomes a capsule and eats the label width. Softened to 8px:
+     same family of shape, still legible at density. */
   .input,
   .select {
-    @apply w-full rounded-md border border-[var(--color-line)] bg-white px-2.5 py-1.5
+    @apply w-full rounded-lg border border-[var(--color-line)] bg-white px-2.5 py-1.5
            text-sm text-[var(--color-ink)] outline-none
            focus:border-[var(--color-brand)] focus:ring-2 focus:ring-[var(--color-brand)]/20
            disabled:bg-[var(--color-paper)] disabled:text-[var(--color-muted)];
@@ -42,11 +62,13 @@ body {
 
   /* Tailwind v4 cannot @apply a custom class, so the shared button base is a
      selector list rather than a `.btn` the others extend. */
+  /* The storefront sets --buttons-radius: 40px, i.e. a pill. It is the most
+     recognisable thing about the brand, so it carries over as-is. */
   .btn,
   .btn-primary,
   .btn-secondary,
   .btn-danger {
-    @apply inline-flex items-center justify-center gap-1.5 rounded-md px-3 py-1.5
+    @apply inline-flex items-center justify-center gap-1.5 rounded-full px-4 py-1.5
            text-sm font-medium whitespace-nowrap transition-colors
            disabled:cursor-not-allowed disabled:opacity-50;
   }

@@ -1,0 +1,5 @@
+# unrs-resolver ships a native binary and needs its build script to run.
+# It arrives via eslint-config-next; without this, pnpm install exits 1 with
+# ERR_PNPM_IGNORED_BUILDS. pnpm 11 spells this "allowBuilds".
+allowBuilds:
+  unrs-resolver: true

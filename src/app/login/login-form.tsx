@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Image from "next/image";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 
@@ -58,9 +59,19 @@ export function LoginForm() {
   }
 
   return (
-    <main className="flex min-h-screen items-center justify-center px-4">
+    <main className="flex min-h-screen flex-col items-center justify-center gap-6 bg-[var(--color-brand)] px-4">
+      {/* White artwork, so it sits on the sage ground rather than the card. */}
+      <Image
+        src="/lattice-lane-logo.png"
+        alt="Lattice Lane"
+        width={600}
+        height={115}
+        priority
+        className="h-7 w-auto"
+      />
+
       <div className="card w-full max-w-sm p-6">
-        <h1 className="text-lg font-semibold">Lattice Lane</h1>
+        <h1 className="text-lg font-semibold">Sign in</h1>
         <p className="mt-0.5 text-sm text-[var(--color-muted)]">
           Hamper costing and quotations
         </p>
