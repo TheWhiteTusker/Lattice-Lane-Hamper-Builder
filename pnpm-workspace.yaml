@@ -1,5 +1,14 @@
-# unrs-resolver ships a native binary and needs its build script to run.
-# It arrives via eslint-config-next; without this, pnpm install exits 1 with
-# ERR_PNPM_IGNORED_BUILDS. pnpm 11 spells this "allowBuilds".
-allowBuilds:
+# Single-package repo. This file exists only to allow one build script, but
+# pnpm 10 treats any pnpm-workspace.yaml as a workspace root and refuses to
+# install without a packages field ("packages field missing or empty"), so it
+# is declared explicitly.
+packages:
+  - .
+
+# unrs-resolver ships a native binary and needs its postinstall to run. It
+# arrives via eslint-config-next. pnpm renamed this setting between majors, so
+# both spellings are present: whichever pnpm runs, one of them applies.
+onlyBuiltDependencies: # pnpm 10
+  - unrs-resolver
+allowBuilds: # pnpm 11
   unrs-resolver: true
