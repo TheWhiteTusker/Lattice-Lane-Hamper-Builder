@@ -21,6 +21,8 @@ Postgres directly, and all pricing lives in database views so it cannot drift.
 | `supabase/migrations/0003_seed.sql` | Default settings and pick-lists |
 | `supabase/migrations/0004_rpc.sql` | Transactional save / duplicate / refresh |
 | `supabase/migrations/0005_rls_performance.sql` | Indexes and per-statement RLS checks |
+| `supabase/migrations/0006_fix_new_user_role_cast.sql` | Cast the new-user role to its enum |
+| `supabase/migrations/0007_guards_allow_direct_sql.sql` | Let direct SQL administer roles and status |
 
 With the Supabase CLI instead: `supabase db push`.
 
