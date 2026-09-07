@@ -19,3 +19,9 @@ allowBuilds: # pnpm 11
   unrs-resolver: true
   esbuild: true
   workerd: true
+
+# Flat node_modules. OpenNext's bundler symlinks pnpm's nested layout while
+# tracing files, which Windows refuses without elevation (EPERM), so
+# `pnpm run cf:build` cannot run locally under the default layout. Hoisting is
+# more permissive than the default, so CI is unaffected.
+nodeLinker: hoisted
