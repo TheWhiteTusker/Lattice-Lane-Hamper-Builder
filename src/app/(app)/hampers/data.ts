@@ -1,0 +1,56 @@
+import type { SupabaseClient } from "@supabase/supabase-js";
+import { loadSettings } from "@/lib/settings";
+import type { Category } from "@/lib/types";
+import type { CatalogProduct } from "./hamper-builder";
+
+type ProductRow = {
+  id: string;
+  code: string;
+  name: string;
+  category_id: string | null;
+  source: string | null;
+  cost_price: number;
+  target_margin: number;
+  default_sp: number;
+  categories: { name: string; counts_as_item: boolean } | null;
+};
+
+/**
+ * Everything the builder needs to work offline in the browser: the active
+ * catalogue, the categories, and the pick-lists. Loading it up front is what
+ * removes the round-trip the spreadsheet made on every category change.
+ */
+export async function loadCatalog(supabase: SupabaseClient) {
+  const [{ data: products }, { data: categories }, settings] = await Promise.all([
+    supabase
+      .from("products")
+      .select(
+        "id, code, name, category_id, source, cost_price, target_margin, default_sp, categories(name, counts_as_item)",
+      )
+      .eq("is_active", true)
+      .order("name")
+      .returns<ProductRow[]>(),
+    supabase
+      .from("categories")
+      .select("*")
+      .order("sort_order")
+      .order("name")
+      .returns<Category[]>(),
+    loadSettings(supabase),
+  ]);
+
+  const catalog: CatalogProduct[] = (products ?? []).map((p) => ({
+    id: p.id,
+    code: p.code,
+    name: p.name,
+    category_id: p.category_id,
+    category_name: p.categories?.name ?? null,
+    counts_as_item: p.categories?.counts_as_item ?? true,
+    source: p.source,
+    cost_price: Number(p.cost_price),
+    target_margin: Number(p.target_margin),
+    default_sp: Number(p.default_sp),
+  }));
+
+  return { products: catalog, categories: categories ?? [], settings };
+}

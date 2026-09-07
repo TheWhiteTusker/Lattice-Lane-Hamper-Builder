@@ -1,0 +1,122 @@
+@import "tailwindcss";
+
+@theme {
+  --color-ink: #16130f;
+  --color-muted: #6b6257;
+  --color-line: #e5ded4;
+  --color-paper: #faf8f5;
+  --color-brand: #7c5c3e;
+  --color-brand-dark: #5d452e;
+  --color-brand-soft: #f2ebe2;
+  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, monospace;
+}
+
+body {
+  background: var(--color-paper);
+  color: var(--color-ink);
+}
+
+/* Costing work is dense and numeric: tabular figures everywhere so columns
+   of money line up, and compact controls so a 20-line hamper fits on screen. */
+@layer components {
+  .card {
+    @apply rounded-lg border border-[var(--color-line)] bg-white;
+  }
+
+  .label {
+    @apply block text-[11px] font-medium uppercase tracking-wide text-[var(--color-muted)];
+  }
+
+  .input,
+  .select {
+    @apply w-full rounded-md border border-[var(--color-line)] bg-white px-2.5 py-1.5
+           text-sm text-[var(--color-ink)] outline-none
+           focus:border-[var(--color-brand)] focus:ring-2 focus:ring-[var(--color-brand)]/20
+           disabled:bg-[var(--color-paper)] disabled:text-[var(--color-muted)];
+  }
+
+  .input-num {
+    @apply text-right tabular-nums;
+  }
+
+  /* Tailwind v4 cannot @apply a custom class, so the shared button base is a
+     selector list rather than a `.btn` the others extend. */
+  .btn,
+  .btn-primary,
+  .btn-secondary,
+  .btn-danger {
+    @apply inline-flex items-center justify-center gap-1.5 rounded-md px-3 py-1.5
+           text-sm font-medium whitespace-nowrap transition-colors
+           disabled:cursor-not-allowed disabled:opacity-50;
+  }
+
+  .btn-primary {
+    @apply bg-[var(--color-brand)] text-white hover:bg-[var(--color-brand-dark)];
+  }
+
+  .btn-secondary {
+    @apply border border-[var(--color-line)] bg-white text-[var(--color-ink)]
+           hover:bg-[var(--color-paper)];
+  }
+
+  .btn-danger {
+    @apply border border-red-200 bg-white text-red-700 hover:bg-red-50;
+  }
+
+  .table {
+    @apply w-full border-collapse text-sm;
+  }
+
+  .table th {
+    @apply border-b border-[var(--color-line)] px-2.5 py-2 text-left text-[11px]
+           font-semibold uppercase tracking-wide text-[var(--color-muted)];
+  }
+
+  .table td {
+    @apply border-b border-[var(--color-line)] px-2.5 py-1.5 align-middle;
+  }
+
+  .table .num {
+    @apply text-right tabular-nums;
+  }
+
+  .badge {
+    @apply inline-block rounded-full border border-[var(--color-line)]
+           bg-[var(--color-paper)] px-2 py-0.5 text-[11px] font-medium;
+  }
+}
+
+/* The quotation print view is a real document: no app chrome, black on white,
+   and rows that never split across a page. */
+@media print {
+  @page {
+    size: A4;
+    margin: 14mm;
+  }
+
+  .no-print {
+    display: none !important;
+  }
+
+  body {
+    background: #fff;
+  }
+
+  .print-sheet {
+    box-shadow: none !important;
+    border: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    max-width: none !important;
+  }
+
+  tr,
+  .avoid-break {
+    break-inside: avoid;
+  }
+
+  thead {
+    display: table-header-group;
+  }
+}
