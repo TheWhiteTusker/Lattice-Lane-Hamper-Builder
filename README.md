@@ -20,6 +20,7 @@ Postgres directly, and all pricing lives in database views so it cannot drift.
 | `supabase/migrations/0002_rls.sql` | Row level security and the role matrix |
 | `supabase/migrations/0003_seed.sql` | Default settings and pick-lists |
 | `supabase/migrations/0004_rpc.sql` | Transactional save / duplicate / refresh |
+| `supabase/migrations/0005_rls_performance.sql` | Indexes and per-statement RLS checks |
 
 With the Supabase CLI instead: `supabase db push`.
 
