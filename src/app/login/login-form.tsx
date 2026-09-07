@@ -60,14 +60,15 @@ export function LoginForm() {
 
   return (
     <main className="flex min-h-screen flex-col items-center justify-center gap-6 bg-[var(--color-brand)] px-4">
-      {/* White artwork, so it sits on the sage ground rather than the card. */}
+      {/* The full lockup, tagline and all — this is the one screen with room
+          for it. White artwork, so it sits on the sage ground, not the card. */}
       <Image
-        src="/lattice-lane-logo.png"
-        alt="Lattice Lane"
-        width={600}
-        height={115}
+        src="/lattice-lane-lockup.png"
+        alt="Lattice Lane — House of Gifting"
+        width={1600}
+        height={976}
         priority
-        className="h-7 w-auto"
+        className="h-32 w-auto"
       />
 
       <div className="card w-full max-w-sm p-6">

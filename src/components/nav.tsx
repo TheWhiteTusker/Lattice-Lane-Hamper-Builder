@@ -33,8 +33,8 @@ export function Nav({ profile }: { profile: Profile }) {
     router.refresh();
   }
 
-  // The storefront logo is white artwork on transparency, so it needs the sage
-  // header behind it — same pairing the site uses.
+  // The header lockup is white artwork on transparency, so it needs the sage
+  // bar behind it — same pairing the storefront uses.
   return (
     <header className="no-print bg-[var(--color-brand)]">
       <div className="mx-auto flex max-w-[1400px] flex-wrap items-center gap-x-6 gap-y-2 px-4 py-3">
@@ -42,10 +42,10 @@ export function Nav({ profile }: { profile: Profile }) {
           <Image
             src="/lattice-lane-logo.png"
             alt="Lattice Lane"
-            width={600}
-            height={115}
+            width={1768}
+            height={203}
             priority
-            className="h-6 w-auto"
+            className="h-7 w-auto"
           />
         </Link>
 
