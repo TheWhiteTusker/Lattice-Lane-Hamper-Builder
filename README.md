@@ -29,10 +29,15 @@ With the Supabase CLI instead: `supabase db push`.
 **3. Configure the app:**
 
 ```bash
-cp .env.local.example .env.local     # then fill in from Project Settings -> API
-npm install
-npm run dev
+cp .env.local.example .env     # then fill in from Project Settings -> API
+pnpm install
+pnpm dev
 ```
+
+Two env files, deliberately: `.env` holds only the two `NEXT_PUBLIC_` values,
+because Next compiles everything in it into the bundle — including the deployed
+Worker. Tooling secrets go in `.env.tooling`, which Next never reads. Both are
+gitignored.
 
 **4. Create the first account.** Open <http://localhost:3000>, choose *Create an
 account*. The first person to sign up becomes the **admin** — everyone after
@@ -125,6 +130,22 @@ own line items.
 
 ## Deploying
 
-Push to GitHub, import the repo in Vercel, and set `NEXT_PUBLIC_SUPABASE_URL`
-and `NEXT_PUBLIC_SUPABASE_ANON_KEY` in the project's environment variables.
-Then add your Vercel URL to Supabase under Authentication → URL Configuration.
+Cloudflare Workers, via [OpenNext](https://opennext.js.org/cloudflare).
+
+```bash
+pnpm run cf:build     # next build + the Worker bundle in .open-next/
+pnpm run cf:preview   # run it locally on workerd
+npx wrangler deploy   # needs CLOUDFLARE_API_TOKEN in .env.tooling
+```
+
+Through Workers Builds instead, set the **build command** to `pnpm run cf:build`
+(plain `next build` does not produce `.open-next/`), and set both
+`NEXT_PUBLIC_` values as **build** variables under Settings → Build. Runtime
+variables do not work: these are compiled in when the build runs, so setting
+them afterwards changes nothing without a rebuild.
+
+Then add the deployed URL to Supabase under Authentication → URL Configuration.
+
+On Windows, `cf:build` fails with `EPERM: symlink` because OpenNext symlinks
+pnpm's nested `node_modules`. Add `nodeLinker: hoisted` to `pnpm-workspace.yaml`
+and reinstall to build locally.
