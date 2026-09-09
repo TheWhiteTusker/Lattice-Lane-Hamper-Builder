@@ -113,6 +113,7 @@ test("option-style quotes have no order total", () => {
 test("percentages survive both spreadsheet export shapes", () => {
   assert.equal(normalizePct(0.35), 0.35); // percent-formatted cell
   assert.equal(normalizePct(35), 0.35); // exported as a whole number
+  assert.equal(normalizePct("80.00%"), 0.8); // .xlsx / Sheets export of a percent cell
   assert.equal(normalizePct(""), 0);
   assert.equal(normalizePct(null), 0);
 });
