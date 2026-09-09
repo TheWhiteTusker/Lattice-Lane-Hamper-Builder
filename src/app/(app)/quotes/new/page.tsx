@@ -10,7 +10,7 @@ const one = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v) 
 export default async function NewQuotePage({ searchParams }: { searchParams: Search }) {
   const params = await searchParams;
   const { supabase, profile } = await requireUser();
-  const { hampers, settings } = await loadQuoteOptions(supabase);
+  const { hampers, packagingCategories, settings } = await loadQuoteOptions(supabase);
 
   return (
     <>
@@ -20,6 +20,7 @@ export default async function NewQuotePage({ searchParams }: { searchParams: Sea
       />
       <QuoteBuilder
         hampers={hampers}
+        packagingCategories={packagingCategories}
         settings={settings}
         canEdit
         canChangeStatus={canManage(profile.role)}

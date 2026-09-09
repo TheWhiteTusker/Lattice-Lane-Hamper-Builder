@@ -65,6 +65,7 @@ export default async function QuotePage({
         quote={quote}
         items={items ?? []}
         hampers={options.hampers}
+        packagingCategories={options.packagingCategories}
         settings={options.settings}
         canEdit={canEdit}
         canChangeStatus={canManage(profile.role)}

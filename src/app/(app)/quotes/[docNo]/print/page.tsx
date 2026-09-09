@@ -4,20 +4,8 @@ import { requireUser } from "@/lib/supabase/server";
 import { loadSettings } from "@/lib/settings";
 import { formatMoney, formatPct, priceQuote, COMBINED_ORDER } from "@/lib/pricing";
 import { PrintButton } from "./print-button";
+import { HamperContents } from "@/components/hamper-contents";
 import type { Category, HamperItem, QuoteItem, QuoteSummary } from "@/lib/types";
-
-/**
- * Detail Mode and Packaging Treatment were captured on every quote line in the
- * spreadsheet but never used - there was no printed document to use them in.
- *
- * Both are free-text pick-lists, so they are matched loosely: anything with
- * "hide" hides the contents, "summary" prints just a count, anything else
- * lists them. Packaging works the same way - "absorb" folds packaging items
- * into the hamper, anything else prints them as their own line.
- */
-const showsContents = (mode: string | null) => !/hide/i.test(mode ?? "");
-const summaryOnly = (mode: string | null) => /summary|count/i.test(mode ?? "");
-const absorbsPackaging = (treatment: string | null) => /absorb/i.test(treatment ?? "");
 
 export default async function PrintQuotePage({
   params,
@@ -68,11 +56,9 @@ export default async function PrintQuotePage({
 
   // Packaging-type categories are the ones Settings marks as not counting
   // toward "No. of Items" - the box, the filler, the ribbon.
-  const isPackaging = new Set(
-    (categories ?? [])
-      .filter((c) => !c.counts_as_item)
-      .map((c) => c.name.trim().toLowerCase()),
-  );
+  const packagingCategories = (categories ?? [])
+    .filter((c) => !c.counts_as_item)
+    .map((c) => c.name);
 
   const totals = priceQuote(
     (lines ?? []).map((l) => ({
@@ -182,12 +168,6 @@ export default async function PrintQuotePage({
           <tbody>
             {(lines ?? []).map((line, index) => {
               const items = line.hamper_id ? (byHamper.get(line.hamper_id) ?? []) : [];
-              const absorb = absorbsPackaging(line.packaging_treatment);
-              const visible = absorb
-                ? items.filter(
-                    (i) => !isPackaging.has((i.category_name ?? "").trim().toLowerCase()),
-                  )
-                : items;
 
               return (
                 <tr key={line.id} className="avoid-break align-top">
@@ -198,28 +178,12 @@ export default async function PrintQuotePage({
                   <td>
                     <div className="font-medium">{line.hamper_name}</div>
 
-                    {showsContents(line.detail_mode) && visible.length > 0 && (
-                      summaryOnly(line.detail_mode) ? (
-                        <div className="mt-0.5 text-[var(--color-muted)]">
-                          {visible.length} items
-                        </div>
-                      ) : (
-                        <ul className="mt-1 space-y-0.5 text-[var(--color-muted)]">
-                          {visible.map((item) => (
-                            <li key={item.id}>
-                              {item.product_name}
-                              {Number(item.qty) !== 1 && ` × ${item.qty}`}
-                            </li>
-                          ))}
-                        </ul>
-                      )
-                    )}
-
-                    {!absorb && line.packaging_treatment && (
-                      <div className="mt-1 text-xs text-[var(--color-muted)]">
-                        Packaging: {line.packaging_treatment}
-                      </div>
-                    )}
+                    <HamperContents
+                      items={items}
+                      detailMode={line.detail_mode}
+                      packagingTreatment={line.packaging_treatment}
+                      packagingCategories={packagingCategories}
+                    />
                   </td>
 
                   <td className="num">{line.qty}</td>

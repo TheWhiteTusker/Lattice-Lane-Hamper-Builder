@@ -4,6 +4,7 @@ import { useActionState, useMemo, useState } from "react";
 import Link from "next/link";
 import { saveQuote, deleteQuote, convertToProforma } from "./actions";
 import { priceQuote, priceQuoteLine, formatMoney, num, round2, COMBINED_ORDER } from "@/lib/pricing";
+import { HamperContents, type ContentItem } from "@/components/hamper-contents";
 import type { Quote, QuoteItem, Settings } from "@/lib/types";
 
 export type HamperOption = {
@@ -11,6 +12,7 @@ export type HamperOption = {
   code: string;
   name: string;
   final_catalogue_sp: number | null;
+  items: ContentItem[];
 };
 
 type Line = {
@@ -45,6 +47,7 @@ export function QuoteBuilder({
   quote,
   items,
   hampers,
+  packagingCategories,
   settings,
   canEdit,
   canChangeStatus,
@@ -53,6 +56,7 @@ export function QuoteBuilder({
   quote?: Quote;
   items?: QuoteItem[];
   hampers: HamperOption[];
+  packagingCategories: string[];
   settings: Settings;
   canEdit: boolean;
   canChangeStatus: boolean;
@@ -127,6 +131,11 @@ export function QuoteBuilder({
     () => new Set(lines.map((l) => l.hamper_code)),
     [lines],
   );
+
+  const contentsOf = useMemo(() => {
+    const map = new Map(hampers.map((h) => [h.id, h.items]));
+    return (hamperId: string | null) => (hamperId && map.get(hamperId)) || [];
+  }, [hampers]);
 
   const payload = JSON.stringify({
     id: quote?.id ?? null,
@@ -406,7 +415,7 @@ export function QuoteBuilder({
                     });
 
                     return (
-                      <tr key={line.key}>
+                      <tr key={line.key} className="[&>td]:align-top">
                         <td>
                           <input
                             aria-label="Option label"
@@ -421,6 +430,15 @@ export function QuoteBuilder({
                           <div className="font-mono text-xs text-[var(--color-muted)]">
                             {line.hamper_code}
                           </div>
+                          {/* Read-only preview of what the printed document
+                              will list for this line. */}
+                          <HamperContents
+                            className="text-xs"
+                            items={contentsOf(line.hamper_id)}
+                            detailMode={line.detail_mode}
+                            packagingTreatment={line.packaging_treatment}
+                            packagingCategories={packagingCategories}
+                          />
                         </td>
                         <td>
                           <input

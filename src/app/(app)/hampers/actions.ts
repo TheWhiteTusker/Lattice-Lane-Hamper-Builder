@@ -62,7 +62,10 @@ export async function saveHamper(
   if (error) return { error: describeError(error) };
 
   revalidatePath("/hampers");
-  redirect(`/hampers/${encodeURIComponent(String(code))}?saved=1`);
+  revalidatePath(`/hampers/${encodeURIComponent(String(code))}`);
+  // Saving is the end of the job, so it lands back on the list rather than
+  // leaving you parked on the hamper you just finished.
+  redirect("/hampers");
 }
 
 export async function duplicateHamper(
