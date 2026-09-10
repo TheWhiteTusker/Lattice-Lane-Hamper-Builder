@@ -47,7 +47,7 @@ Worker — so anything in the first two ships to the browser. That is fine for t
 `NEXT_PUBLIC_` pair (the anon key is RLS-scoped and public by design) and fatal
 for anything else, which is why tooling secrets are in a file Next never opens.
 
-**4. Create the first account.** Open <http://localhost:3000>, choose *Create an
+**4. Create the first account.** Open <http://localhost:3015>, choose *Create an
 account*. The first person to sign up becomes the **admin** — everyone after
 starts as **sales**. Once the team is in, turn off open sign-ups in Supabase
 under Authentication → Providers → Email.
@@ -124,7 +124,7 @@ Two behaviours carried over deliberately:
 ## Development
 
 ```bash
-npm run dev        # http://localhost:3000
+npm run dev        # http://localhost:3015
 npm test           # pricing and import mapping, via node --test
 npm run typecheck
 npm run lint
