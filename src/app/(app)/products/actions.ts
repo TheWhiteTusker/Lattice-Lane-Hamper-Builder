@@ -23,8 +23,10 @@ const ProductSchema = z.object({
     .nullable(),
   source: optionalText,
   cost_price: money,
+  markup_pct: z.coerce.number().default(0),
   target_margin: percent,
   default_sp: money,
+  colors: z.array(z.string()).default([]),
   is_active: checkbox,
 });
 
@@ -32,7 +34,10 @@ export async function saveProduct(
   _prev: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
-  const parsed = ProductSchema.safeParse(Object.fromEntries(formData));
+  const rawData: Record<string, unknown> = Object.fromEntries(formData);
+  rawData.colors = formData.getAll("colors").map(String).filter(Boolean);
+
+  const parsed = ProductSchema.safeParse(rawData);
 
   if (!parsed.success) {
     return { error: parsed.error.issues[0].message };

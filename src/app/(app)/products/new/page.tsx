@@ -15,7 +15,11 @@ export default async function NewProductPage() {
   return (
     <>
       <PageHeader title="New product" subtitle="Adds a line to the Product Master" />
-      <ProductForm categories={categories ?? []} sources={settings.sources} />
+      <ProductForm
+        categories={categories ?? []}
+        sources={settings.sources}
+        allColors={settings.product_colors}
+      />
     </>
   );
 }

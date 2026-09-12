@@ -59,3 +59,7 @@ next-env.d.ts
 
 # Tooling secrets, never read by Next.
 .env.tooling
+
+# Auto-generated agent rules by Next.js
+AGENTS.md
+CLAUDE.md

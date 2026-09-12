@@ -39,6 +39,9 @@ export default async function ProductsPage({ searchParams }: { searchParams: Sea
         title="Product Master"
         subtitle={`${rows.length} product${rows.length === 1 ? "" : "s"}${showInactive ? " including inactive" : ""}`}
       >
+        <Link href="/cost-calculator" className="btn-secondary">
+          Cost Calculator
+        </Link>
         <a href="/api/products/export" className="btn-secondary">
           Export CSV
         </a>
@@ -113,6 +116,7 @@ export default async function ProductsPage({ searchParams }: { searchParams: Sea
                 <th>Category</th>
                 <th>Source</th>
                 <th className="num">Cost</th>
+                <th className="num">Markup</th>
                 <th className="num">Margin</th>
                 <th className="num">Selling price</th>
                 <th></th>
@@ -129,17 +133,26 @@ export default async function ProductsPage({ searchParams }: { searchParams: Sea
                   <td className="text-[var(--color-muted)]">{p.categories?.name ?? "—"}</td>
                   <td className="text-[var(--color-muted)]">{p.source ?? "—"}</td>
                   <td className="num">{formatMoney(p.cost_price)}</td>
+                  <td className="num">{p.markup_pct != null ? `${p.markup_pct}%` : "—"}</td>
                   <td className="num">{formatPct(p.target_margin, 0)}</td>
                   <td className="num">{formatMoney(p.default_sp)}</td>
                   <td className="num">
-                    {admin && (
+                    <div className="flex items-center justify-end gap-2.5">
                       <Link
-                        href={`/products/${encodeURIComponent(p.code)}`}
-                        className="text-[var(--color-brand)] hover:underline"
+                        href={`/cost-calculator?product=${encodeURIComponent(p.code)}`}
+                        className="text-[var(--color-brand)] hover:underline font-medium"
                       >
-                        Edit
+                        Costing
                       </Link>
-                    )}
+                      {admin && (
+                        <Link
+                          href={`/products/${encodeURIComponent(p.code)}`}
+                          className="text-[var(--color-muted)] hover:text-[var(--color-ink)] hover:underline"
+                        >
+                          Edit
+                        </Link>
+                      )}
+                    </div>
                   </td>
                 </tr>
               ))}

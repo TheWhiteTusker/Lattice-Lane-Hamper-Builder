@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireRole } from "@/lib/supabase/server";
 import { loadSettings } from "@/lib/settings";
@@ -27,11 +28,19 @@ export default async function EditProductPage({
 
   return (
     <>
-      <PageHeader title={product.name} subtitle={product.code} />
+      <PageHeader title={product.name} subtitle={product.code}>
+        <Link
+          href={`/cost-calculator?product=${encodeURIComponent(product.code)}`}
+          className="btn-secondary"
+        >
+          Cost Calculator
+        </Link>
+      </PageHeader>
       <ProductForm
         product={product}
         categories={categories ?? []}
         sources={settings.sources}
+        allColors={settings.product_colors}
       />
     </>
   );

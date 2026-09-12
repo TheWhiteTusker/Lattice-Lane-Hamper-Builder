@@ -18,6 +18,8 @@ export type CatalogProduct = {
   cost_price: number;
   target_margin: number;
   default_sp: number;
+  colors?: string[];
+  markup_pct?: number;
 };
 
 type Line = {

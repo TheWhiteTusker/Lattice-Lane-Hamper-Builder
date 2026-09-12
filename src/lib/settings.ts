@@ -22,6 +22,7 @@ export const SETTINGS_DEFAULTS: Settings = {
   default_packaging_treatment: "Absorb into Box & Packaging",
   default_validity: "15 Days",
   quote_terms: "",
+  product_colors: ["Walnut", "Natural", "Teak", "Raw", "Dark Oak", "White", "Black"],
 };
 
 /** Flattens the app_settings key/value rows into one Settings object. */

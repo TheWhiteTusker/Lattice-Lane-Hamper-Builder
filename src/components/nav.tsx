@@ -21,6 +21,7 @@ export function Nav({ profile }: { profile: Profile }) {
     { href: "/hampers", label: "Hampers" },
     { href: "/quotes", label: "Quotes" },
     { href: "/products", label: "Products" },
+    { href: "/cost-calculator", label: "Cost Calculator" },
     ...(profile.role === "admin" ? [{ href: "/settings", label: "Settings" }] : []),
   ];
 

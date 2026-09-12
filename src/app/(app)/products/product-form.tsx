@@ -10,34 +10,96 @@ export function ProductForm({
   product,
   categories,
   sources,
+  allColors = ["Walnut", "Natural", "Teak", "Raw", "Dark Oak", "White", "Black"],
 }: {
   product?: Product;
   categories: Category[];
   sources: string[];
+  allColors?: string[];
 }) {
   const [state, action, pending] = useActionState(saveProduct, {});
   const [deleteState, deleteAction, deleting] = useActionState(deleteProduct, {});
 
   const [costPrice, setCostPrice] = useState(String(product?.cost_price ?? ""));
+  const [markup, setMarkup] = useState(
+    product?.markup_pct != null
+      ? String(product.markup_pct)
+      : product && product.cost_price > 0 && product.default_sp > 0
+        ? String(round2(((product.default_sp - product.cost_price) / product.cost_price) * 100))
+        : "100",
+  );
   const [margin, setMargin] = useState(
     product ? String(round2(product.target_margin * 100)) : "",
   );
   const [sellingPrice, setSellingPrice] = useState(String(product?.default_sp ?? ""));
+  const [selectedColors, setSelectedColors] = useState<string[]>(
+    product?.colors && product.colors.length > 0 ? product.colors : ["Walnut"],
+  );
 
-  // Selling price is stored, not derived - the sheet worked that way, and real
-  // catalogue prices get rounded to something sensible. This just does the
-  // arithmetic so nobody reaches for a calculator.
-  function applyMargin() {
+  function applyMarkup(val?: string) {
     const cp = Number(costPrice);
-    const m = Number(margin) / 100;
+    const m = Number(val ?? markup);
+    if (!Number.isFinite(cp) || !Number.isFinite(m)) return;
+    const sp = round2(cp * (1 + m / 100));
+    setSellingPrice(String(sp));
+    if (sp > 0) {
+      setMargin(String(round2(((sp - cp) / sp) * 100)));
+    }
+  }
+
+  function applyMargin(val?: string) {
+    const cp = Number(costPrice);
+    const m = Number(val ?? margin) / 100;
     if (!Number.isFinite(cp) || !Number.isFinite(m) || m >= 1) return;
-    setSellingPrice(String(round2(cp / (1 - m))));
+    const sp = round2(cp / (1 - m));
+    setSellingPrice(String(sp));
+    if (cp > 0) {
+      setMarkup(String(round2(((sp - cp) / cp) * 100)));
+    }
+  }
+
+  function handleSpChange(val: string) {
+    setSellingPrice(val);
+    const sp = Number(val);
+    const cp = Number(costPrice);
+    if (Number.isFinite(sp) && Number.isFinite(cp) && cp > 0 && sp > 0) {
+      setMarkup(String(round2(((sp - cp) / cp) * 100)));
+      setMargin(String(round2(((sp - cp) / sp) * 100)));
+    }
+  }
+
+  function toggleColor(col: string) {
+    setSelectedColors((prev) =>
+      prev.includes(col) ? prev.filter((c) => c !== col) : [...prev, col],
+    );
   }
 
   return (
     <>
+      {product && (
+        <div className="mb-4 max-w-2xl flex flex-wrap items-center justify-between gap-3 rounded-xl bg-emerald-50/70 p-4 border border-[var(--color-brand)]/30">
+          <div>
+            <span className="text-xs font-bold uppercase tracking-wider text-[var(--color-brand-dark)]">
+              Multi-Stage Costing
+            </span>
+            <p className="text-xs text-[var(--color-muted)] mt-0.5">
+              Break down this product into Material, Hardware, Finishing & Machine per-minute costs.
+            </p>
+          </div>
+          <Link
+            href={`/cost-calculator?product=${encodeURIComponent(product.code)}`}
+            className="btn-primary text-xs py-1.5 px-3"
+          >
+            Open in Cost Calculator &rarr;
+          </Link>
+        </div>
+      )}
+
       <form action={action} className="card max-w-2xl p-5">
         {product && <input type="hidden" name="id" value={product.id} />}
+        {selectedColors.map((col) => (
+          <input key={col} type="hidden" name="colors" value={col} />
+        ))}
 
         <div className="grid gap-4 sm:grid-cols-2">
           <div>
@@ -104,9 +166,35 @@ export function ProductForm({
             </datalist>
           </div>
 
+          {/* Color Selection */}
+          <div className="sm:col-span-2">
+            <label className="label">Available Colors / Finishes</label>
+            <div className="mt-1.5 flex flex-wrap gap-2">
+              {allColors.map((col) => {
+                const checked = selectedColors.includes(col);
+                return (
+                  <button
+                    key={col}
+                    type="button"
+                    onClick={() => toggleColor(col)}
+                    className={`rounded-full px-3 py-1 text-xs font-medium transition-all ${
+                      checked
+                        ? "bg-[var(--color-brand)] text-white shadow-sm"
+                        : "bg-[var(--color-sheet)] text-[var(--color-muted)] hover:bg-slate-200"
+                    }`}
+                  >
+                    {checked ? "✓ " : "+ "}
+                    {col}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Cost Price */}
           <div>
             <label className="label" htmlFor="cost_price">
-              Cost price
+              Cost price (₹)
             </label>
             <input
               id="cost_price"
@@ -114,10 +202,35 @@ export function ProductForm({
               inputMode="decimal"
               value={costPrice}
               onChange={(e) => setCostPrice(e.target.value)}
-              className="input input-num mt-1"
+              className="input input-num mt-1 font-mono"
             />
           </div>
 
+          {/* Markup % */}
+          <div>
+            <label className="label" htmlFor="markup_pct">
+              Markup %
+            </label>
+            <div className="mt-1 flex gap-2">
+              <input
+                id="markup_pct"
+                name="markup_pct"
+                inputMode="decimal"
+                value={markup}
+                onChange={(e) => setMarkup(e.target.value)}
+                className="input input-num font-mono"
+              />
+              <button
+                type="button"
+                onClick={() => applyMarkup()}
+                className="btn-secondary whitespace-nowrap"
+              >
+                Apply
+              </button>
+            </div>
+          </div>
+
+          {/* Target Margin % */}
           <div>
             <label className="label" htmlFor="target_margin">
               Target margin %
@@ -129,40 +242,46 @@ export function ProductForm({
                 inputMode="decimal"
                 value={margin}
                 onChange={(e) => setMargin(e.target.value)}
-                className="input input-num"
+                className="input input-num font-mono"
               />
-              <button type="button" onClick={applyMargin} className="btn-secondary">
+              <button
+                type="button"
+                onClick={() => applyMargin()}
+                className="btn-secondary whitespace-nowrap"
+              >
                 Apply
               </button>
             </div>
           </div>
 
+          {/* Selling Price */}
           <div>
             <label className="label" htmlFor="default_sp">
-              Selling price
+              Selling price (₹)
             </label>
             <input
               id="default_sp"
               name="default_sp"
               inputMode="decimal"
               value={sellingPrice}
-              onChange={(e) => setSellingPrice(e.target.value)}
-              className="input input-num mt-1"
+              onChange={(e) => handleSpChange(e.target.value)}
+              className="input input-num mt-1 font-mono font-bold text-[var(--color-ink)]"
             />
           </div>
 
-          <label className="flex items-end gap-2 pb-2 text-sm">
+          <label className="sm:col-span-2 flex items-center gap-2 py-1 text-sm cursor-pointer">
             <input
               type="checkbox"
               name="is_active"
               defaultChecked={product ? product.is_active : true}
+              className="h-4 w-4 rounded text-[var(--color-brand)] focus:ring-[var(--color-brand)]"
             />
-            Active — available when building hampers
+            <span className="font-medium">Active — available when building hampers</span>
           </label>
         </div>
 
         {state.error && (
-          <p role="alert" className="mt-4 text-sm text-red-700">
+          <p role="alert" className="mt-4 text-sm text-red-700 font-medium">
             {state.error}
           </p>
         )}
