@@ -4,6 +4,12 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { calculateCostSheetTotals, calculateLineCost } from "@/lib/costing.ts";
 import { describeError } from "@/lib/forms";
+import {
+  formatProductCode,
+  parseProductCode,
+  getNextSerialForCategory,
+  STANDARD_PRODUCT_COLORS,
+} from "@/lib/product-code";
 import type { ProductCostLine } from "@/lib/types";
 
 export type SaveCostSheetPayload = {
@@ -18,6 +24,7 @@ export type SaveCostSheetPayload = {
   markupPct: number;
   sellingPrice?: number;
   notes?: string | null;
+  createAllColorVariants?: boolean;
   lines: ProductCostLine[];
 };
 
@@ -186,6 +193,44 @@ export async function saveCostSheetAndProduct(payload: SaveCostSheetPayload) {
       if (lErr) return { error: `Error saving cost lines: ${describeError(lErr)}` };
     }
 
+    // 3.5. Optionally create / sync all 3 standard color variants (Walnut, Natural, Black)
+    const createdVariants: string[] = [];
+    if (payload.createAllColorVariants) {
+      const parsed = parseProductCode(code);
+      const catCode = parsed.categoryCode || "XX";
+      const serial = parsed.serial || "0001";
+
+      for (const col of STANDARD_PRODUCT_COLORS) {
+        const variantCode = formatProductCode(catCode, serial, col.code);
+        createdVariants.push(variantCode);
+
+        const variantValues = {
+          code: variantCode,
+          name: name,
+          category_id: payload.categoryId || null,
+          source: payload.source || null,
+          cost_price: totals.total_cost,
+          markup_pct: totals.markup_pct,
+          target_margin: targetMargin,
+          default_sp: finalSellingPrice,
+          colors: [col.name],
+          is_active: payload.isActive !== false,
+        };
+
+        const { data: exVariant } = await supabase
+          .from("products")
+          .select("id")
+          .eq("code", variantCode)
+          .maybeSingle();
+
+        if (exVariant) {
+          await supabase.from("products").update(variantValues).eq("id", exVariant.id);
+        } else {
+          await supabase.from("products").insert(variantValues);
+        }
+      }
+    }
+
     revalidatePath("/cost-calculator");
     revalidatePath("/products");
     revalidatePath(`/products/${encodeURIComponent(code)}`);
@@ -198,9 +243,25 @@ export async function saveCostSheetAndProduct(payload: SaveCostSheetPayload) {
       productCode: code,
       totalCost: totals.total_cost,
       sellingPrice: finalSellingPrice,
+      variants: createdVariants.length > 0 ? createdVariants : undefined,
     };
   } catch (err: unknown) {
     return { error: err instanceof Error ? err.message : String(err) };
+  }
+}
+
+export async function getNextSerialAction(
+  categoryCode: string,
+): Promise<{ serial: string; error?: string }> {
+  try {
+    const supabase = await createClient();
+    const { data: products, error } = await supabase.from("products").select("code");
+    if (error) return { serial: "0001", error: describeError(error) };
+    const codes = (products ?? []).map((p: { code: string }) => p.code);
+    const nextSerial = getNextSerialForCategory(categoryCode, codes);
+    return { serial: nextSerial };
+  } catch (err: unknown) {
+    return { serial: "0001", error: describeError(err) };
   }
 }
 

@@ -4,6 +4,7 @@ import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { type ActionState, checkbox, describeError, percent } from "@/lib/forms";
+import { deriveCategoryCode } from "@/lib/product-code";
 
 async function saveSetting(key: string, value: unknown): Promise<ActionState> {
   const supabase = await createClient();
@@ -97,8 +98,12 @@ export async function saveCategory(
   const name = String(formData.get("name") ?? "").trim();
   if (!name) return { error: "Category name is required." };
 
+  const rawCode = String(formData.get("code") ?? "").trim().toUpperCase();
+  const code = rawCode || deriveCategoryCode(name);
+
   const values = {
     name,
+    code,
     counts_as_item: checkbox.parse(formData.get("counts_as_item") ?? undefined),
     sort_order: Number(formData.get("sort_order") ?? 0) || 0,
   };

@@ -2,6 +2,7 @@
 
 import { useActionState, useId, useMemo, useState } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { saveHamper, duplicateHamper, deleteHamper } from "./actions";
 import { priceHamper, formatMoney, formatPct, num, round2 } from "@/lib/pricing";
 import type { Category, Hamper, HamperItem, Settings } from "@/lib/types";
@@ -20,6 +21,7 @@ export type CatalogProduct = {
   default_sp: number;
   colors?: string[];
   markup_pct?: number;
+  image_url?: string | null;
 };
 
 type Line = {
@@ -580,6 +582,7 @@ function LineRow({
 
   const totalCp = num(line.qty) * num(line.unit_cp);
   const totalSp = num(line.qty) * num(line.unit_sp);
+  const selectedProduct = products.find((p) => p.id === line.product_id);
 
   return (
     <tr>
@@ -605,24 +608,40 @@ function LineRow({
       </td>
 
       <td>
-        <Combo
-          label="Product"
-          placeholder="Search products…"
-          value={line.product_name ? productLabel(line.product_name, line.product_code) : ""}
-          options={Array.from(byLabel.keys())}
-          disabled={!canEdit}
-          onPick={(text) => {
-            const p = byLabel.get(text);
-            if (p) onSelectProduct(p.id);
-            else if (text === "") onSelectProduct("");
-          }}
-        />
-        {/* A product that has since been retired still shows on saved lines. */}
-        {!line.product_id && line.product_name && (
-          <div className="mt-0.5 text-xs text-[var(--color-muted)]">
-            No longer in Product Master
+        <div className="flex items-center gap-2">
+          {selectedProduct?.image_url && (
+            <div className="relative h-8 w-8 shrink-0 overflow-hidden rounded-md border border-slate-200 bg-slate-100 shadow-2xs">
+              <Image
+                src={selectedProduct.image_url}
+                alt={selectedProduct.name}
+                fill
+                sizes="32px"
+                className="object-cover"
+                unoptimized
+              />
+            </div>
+          )}
+          <div className="min-w-0 flex-1">
+            <Combo
+              label="Product"
+              placeholder="Search products…"
+              value={line.product_name ? productLabel(line.product_name, line.product_code) : ""}
+              options={Array.from(byLabel.keys())}
+              disabled={!canEdit}
+              onPick={(text) => {
+                const p = byLabel.get(text);
+                if (p) onSelectProduct(p.id);
+                else if (text === "") onSelectProduct("");
+              }}
+            />
+            {/* A product that has since been retired still shows on saved lines. */}
+            {!line.product_id && line.product_name && (
+              <div className="mt-0.5 text-xs text-[var(--color-muted)]">
+                No longer in Product Master
+              </div>
+            )}
           </div>
-        )}
+        </div>
       </td>
 
       <td className="font-mono text-xs text-[var(--color-muted)]">{line.product_code || "—"}</td>

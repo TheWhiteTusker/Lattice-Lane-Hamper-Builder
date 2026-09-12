@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Image from "next/image";
 import { requireUser, isAdmin } from "@/lib/supabase/server";
 import { PageHeader, EmptyState } from "@/components/ui";
 import { formatMoney, formatPct } from "@/lib/pricing";
@@ -111,6 +112,7 @@ export default async function ProductsPage({ searchParams }: { searchParams: Sea
           <table className="table">
             <thead>
               <tr>
+                <th className="w-12 text-center">Photo</th>
                 <th>Code</th>
                 <th>Product</th>
                 <th>Category</th>
@@ -125,6 +127,24 @@ export default async function ProductsPage({ searchParams }: { searchParams: Sea
             <tbody>
               {rows.map((p) => (
                 <tr key={p.id} className={p.is_active ? "" : "opacity-55"}>
+                  <td className="w-12 py-1.5 px-2 text-center">
+                    {p.image_url ? (
+                      <div className="relative mx-auto h-9 w-9 overflow-hidden rounded-md border border-slate-200 bg-slate-100 shadow-2xs">
+                        <Image
+                          src={p.image_url}
+                          alt={p.name}
+                          fill
+                          sizes="36px"
+                          className="object-cover"
+                          unoptimized
+                        />
+                      </div>
+                    ) : (
+                      <div className="mx-auto flex h-9 w-9 items-center justify-center rounded-md border border-dashed border-slate-200 bg-slate-50 text-[9px] font-bold text-slate-300">
+                        IMG
+                      </div>
+                    )}
+                  </td>
                   <td className="font-mono whitespace-nowrap">{p.code}</td>
                   <td>
                     {p.name}

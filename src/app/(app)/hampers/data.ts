@@ -14,6 +14,7 @@ type ProductRow = {
   target_margin: number;
   default_sp: number;
   colors: string[];
+  image_url: string | null;
   categories: { name: string; counts_as_item: boolean } | null;
 };
 
@@ -27,7 +28,7 @@ export async function loadCatalog(supabase: SupabaseClient) {
     supabase
       .from("products")
       .select(
-        "id, code, name, category_id, source, cost_price, markup_pct, target_margin, default_sp, colors, categories(name, counts_as_item)",
+        "id, code, name, category_id, source, cost_price, markup_pct, target_margin, default_sp, colors, image_url, categories(name, counts_as_item)",
       )
       .eq("is_active", true)
       .order("name")
@@ -54,6 +55,7 @@ export async function loadCatalog(supabase: SupabaseClient) {
     target_margin: Number(p.target_margin),
     default_sp: Number(p.default_sp),
     colors: p.colors ?? [],
+    image_url: p.image_url ?? null,
   }));
 
   return { products: catalog, categories: categories ?? [], settings };

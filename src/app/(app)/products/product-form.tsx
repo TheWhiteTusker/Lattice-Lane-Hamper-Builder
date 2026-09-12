@@ -4,15 +4,24 @@ import { useActionState, useState } from "react";
 import Link from "next/link";
 import { saveProduct, deleteProduct } from "./actions";
 import { round2 } from "@/lib/pricing";
-import type { Category, Product } from "@/lib/types";
+import {
+  formatProductCode,
+  parseProductCode,
+  STANDARD_PRODUCT_COLORS,
+  COLOR_TO_CODE,
+  deriveCategoryCode,
+} from "@/lib/product-code";
+import { ProductImagesManager } from "@/components/product-images-manager";
+import type { Category, Product, ProductImage } from "@/lib/types";
 
 export function ProductForm({
   product,
+  initialImages = [],
   categories,
   sources,
-  allColors = ["Walnut", "Natural", "Teak", "Raw", "Dark Oak", "White", "Black"],
 }: {
   product?: Product;
+  initialImages?: ProductImage[];
   categories: Category[];
   sources: string[];
   allColors?: string[];
@@ -20,6 +29,8 @@ export function ProductForm({
   const [state, action, pending] = useActionState(saveProduct, {});
   const [deleteState, deleteAction, deleting] = useActionState(deleteProduct, {});
 
+  const [code, setCode] = useState(product?.code ?? "");
+  const [categoryId, setCategoryId] = useState(product?.category_id ?? "");
   const [costPrice, setCostPrice] = useState(String(product?.cost_price ?? ""));
   const [markup, setMarkup] = useState(
     product?.markup_pct != null
@@ -35,6 +46,8 @@ export function ProductForm({
   const [selectedColors, setSelectedColors] = useState<string[]>(
     product?.colors && product.colors.length > 0 ? product.colors : ["Walnut"],
   );
+
+  const parsedCode = parseProductCode(code);
 
   function applyMarkup(val?: string) {
     const cp = Number(costPrice);
@@ -74,6 +87,26 @@ export function ProductForm({
     );
   }
 
+  function handleCategoryChange(newCatId: string) {
+    setCategoryId(newCatId);
+    const cat = categories.find((c) => c.id === newCatId);
+    const catCode = cat?.code || (cat ? deriveCategoryCode(cat.name) : "LC");
+    const currentParsed = parseProductCode(code);
+    const colorCode =
+      currentParsed.colorCode ||
+      (selectedColors[0] ? COLOR_TO_CODE[selectedColors[0].toLowerCase()] : "WL");
+    setCode(formatProductCode(catCode, currentParsed.serial || "0001", colorCode));
+  }
+
+  function handleColorSelect(colName: string) {
+    toggleColor(colName);
+    const colCode = COLOR_TO_CODE[colName.toLowerCase()] || "WL";
+    const currentParsed = parseProductCode(code);
+    const cat = categories.find((c) => c.id === categoryId);
+    const catCode = cat?.code || currentParsed.categoryCode || "LC";
+    setCode(formatProductCode(catCode, currentParsed.serial || "0001", colCode));
+  }
+
   return (
     <>
       {product && (
@@ -103,16 +136,43 @@ export function ProductForm({
 
         <div className="grid gap-4 sm:grid-cols-2">
           <div>
-            <label className="label" htmlFor="code">
-              Product code
-            </label>
+            <div className="flex items-center justify-between">
+              <label className="label" htmlFor="code">
+                Product code *
+              </label>
+              <button
+                type="button"
+                onClick={() => {
+                  const cat = categories.find((c) => c.id === categoryId);
+                  const catCode = cat?.code || (cat ? deriveCategoryCode(cat.name) : "LC");
+                  const col = selectedColors[0] || "Walnut";
+                  setCode(formatProductCode(catCode, parsedCode.serial || "0001", col));
+                }}
+                className="text-[11px] text-[var(--color-brand)] hover:underline"
+              >
+                Auto-format
+              </button>
+            </div>
             <input
               id="code"
               name="code"
               required
-              defaultValue={product?.code}
-              className="input mt-1 font-mono"
+              value={code}
+              onChange={(e) => setCode(e.target.value.toUpperCase())}
+              placeholder="e.g. LC/0001/WL"
+              className="input mt-1 font-mono uppercase"
             />
+            <div className="mt-1 flex items-center justify-between text-xs">
+              <span
+                className={
+                  parsedCode.isValid ? "text-emerald-700 font-medium" : "text-amber-700"
+                }
+              >
+                {parsedCode.isValid
+                  ? `✓ Valid: ${parsedCode.categoryCode}/${parsedCode.serial}/${parsedCode.colorCode} (${parsedCode.colorName})`
+                  : `Format: [CAT]/[0001]/[COLOR] (e.g. LC/0001/WL)`}
+              </span>
+            </div>
           </div>
 
           <div>
@@ -122,13 +182,14 @@ export function ProductForm({
             <select
               id="category_id"
               name="category_id"
-              defaultValue={product?.category_id ?? ""}
+              value={categoryId}
+              onChange={(e) => handleCategoryChange(e.target.value)}
               className="select mt-1"
             >
               <option value="">No category</option>
               {categories.map((c) => (
                 <option key={c.id} value={c.id}>
-                  {c.name}
+                  {c.code ? `[${c.code}] ` : ""}{c.name}
                   {c.counts_as_item ? "" : " (not counted as an item)"}
                 </option>
               ))}
@@ -168,23 +229,34 @@ export function ProductForm({
 
           {/* Color Selection */}
           <div className="sm:col-span-2">
-            <label className="label">Available Colors / Finishes</label>
+            <div className="flex items-center justify-between">
+              <label className="label">Available Colors / Finishes (3 only)</label>
+              <span className="text-xs text-[var(--color-muted)]">
+                Walnut (WL), Natural (NT), Black (BL)
+              </span>
+            </div>
             <div className="mt-1.5 flex flex-wrap gap-2">
-              {allColors.map((col) => {
-                const checked = selectedColors.includes(col);
+              {STANDARD_PRODUCT_COLORS.map((col) => {
+                const checked = selectedColors.includes(col.name);
                 return (
                   <button
-                    key={col}
+                    key={col.code}
                     type="button"
-                    onClick={() => toggleColor(col)}
-                    className={`rounded-full px-3 py-1 text-xs font-medium transition-all ${
+                    onClick={() => handleColorSelect(col.name)}
+                    className={`flex items-center gap-2 rounded-full px-3 py-1 text-xs font-medium transition-all ${
                       checked
                         ? "bg-[var(--color-brand)] text-white shadow-sm"
                         : "bg-[var(--color-sheet)] text-[var(--color-muted)] hover:bg-slate-200"
                     }`}
                   >
-                    {checked ? "✓ " : "+ "}
-                    {col}
+                    <span
+                      className="inline-block h-2.5 w-2.5 rounded-full border border-black/20"
+                      style={{ backgroundColor: col.hex }}
+                    />
+                    <span>
+                      {col.name} ({col.code})
+                    </span>
+                    {checked && <span>✓</span>}
                   </button>
                 );
               })}
@@ -295,6 +367,16 @@ export function ProductForm({
           </Link>
         </div>
       </form>
+
+      {/* Product Images & Color Finishes Gallery */}
+      <div className="card max-w-2xl p-5 mt-4">
+        <ProductImagesManager
+          productId={product?.id}
+          initialImages={initialImages}
+          productName={product?.name}
+          currentColor={selectedColors[0] || "Walnut"}
+        />
+      </div>
 
       {product && (
         <form action={deleteAction} className="mt-4 max-w-2xl">

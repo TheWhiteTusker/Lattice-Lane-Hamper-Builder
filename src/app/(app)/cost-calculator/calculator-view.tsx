@@ -2,6 +2,7 @@
 
 import { useState, useMemo, useTransition } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { formatMoney, formatPct, round2, num } from "@/lib/pricing.ts";
 import {
@@ -10,7 +11,19 @@ import {
   type DimensionUnit,
   COMMON_UNITS,
 } from "@/lib/costing.ts";
-import { saveCostSheetAndProduct, type SaveCostSheetPayload } from "./actions";
+import {
+  formatProductCode,
+  parseProductCode,
+  getNextSerialForCategory,
+  STANDARD_PRODUCT_COLORS,
+  COLOR_TO_CODE,
+  deriveCategoryCode,
+} from "@/lib/product-code";
+import {
+  saveCostSheetAndProduct,
+  getNextSerialAction,
+  type SaveCostSheetPayload,
+} from "./actions";
 import type {
   Category,
   CostStageWithHierarchy,
@@ -57,14 +70,13 @@ export function CostCalculatorView({
   stages,
   categories,
   products,
-  productColors,
   initialProduct,
   initialSheet,
 }: {
   stages: CostStageWithHierarchy[];
   categories: Category[];
   products: Product[];
-  productColors: string[];
+  productColors?: string[];
   initialProduct?: Product | null;
   initialSheet?: ProductCostSheet | null;
 }) {
@@ -310,15 +322,39 @@ export function CostCalculatorView({
     }
   }
 
-  // Toggle color selection
-  function toggleColor(c: string) {
-    setSelectedColors((prev) =>
-      prev.includes(c) ? prev.filter((x) => x !== c) : [...prev, c],
-    );
+  const parsedCode = parseProductCode(code);
+
+  async function handleCategoryChange(newCatId: string) {
+    setCategoryId(newCatId);
+    const cat = categories.find((c) => c.id === newCatId);
+    const catCode = cat?.code || (cat ? deriveCategoryCode(cat.name) : "LC");
+
+    let serial = parsedCode.serial || "0001";
+    if (!selectedProductId) {
+      const existingCodes = products.map((p) => p.code);
+      serial = getNextSerialForCategory(catCode, existingCodes);
+      startTransition(async () => {
+        const res = await getNextSerialAction(catCode);
+        if (res.serial) {
+          const colCode = parsedCode.colorCode || "WL";
+          setCode(formatProductCode(catCode, res.serial, colCode));
+        }
+      });
+    }
+    const colCode = parsedCode.colorCode || "WL";
+    setCode(formatProductCode(catCode, serial, colCode));
+  }
+
+  function handleColorSelect(colName: string) {
+    setSelectedColors([colName]);
+    const colCode = COLOR_TO_CODE[colName.toLowerCase()] || "WL";
+    const cat = categories.find((c) => c.id === categoryId);
+    const catCode = cat?.code || parsedCode.categoryCode || "LC";
+    setCode(formatProductCode(catCode, parsedCode.serial || "0001", colCode));
   }
 
   // Save to Product Master
-  function handleSave() {
+  function handleSave(allVariants: boolean = false) {
     setFeedback({});
     if (!code.trim()) {
       setFeedback({ error: "Product Code is required." });
@@ -342,6 +378,7 @@ export function CostCalculatorView({
         markupPct: num(markupPct),
         sellingPrice: effectiveSp,
         notes: notes.trim() || null,
+        createAllColorVariants: allVariants,
         lines: lines.map((l) => ({
           stage_code: l.stage_code,
           category_name: l.category_name,
@@ -366,8 +403,12 @@ export function CostCalculatorView({
       if (res.error) {
         setFeedback({ error: res.error });
       } else {
+        const variantMsg =
+          res.variants && res.variants.length > 0
+            ? ` Generated all 3 variants (${res.variants.join(", ")}).`
+            : "";
         setFeedback({
-          success: `Saved successfully! Product ${res.productCode} updated with CP ${formatMoney(res.totalCost)} and SP ${formatMoney(res.sellingPrice)}.`,
+          success: `Saved successfully! Product ${res.productCode} updated with CP ${formatMoney(res.totalCost)} and SP ${formatMoney(res.sellingPrice)}.${variantMsg}`,
         });
         if (res.productId) setSelectedProductId(res.productId);
       }
@@ -379,13 +420,27 @@ export function CostCalculatorView({
       {/* ---------------- PRODUCT DETAILS HEADER ---------------- */}
       <div className="card p-5">
         <div className="flex flex-wrap items-center justify-between gap-4 border-b border-[var(--color-border)] pb-4">
-          <div>
-            <h2 className="text-lg font-bold text-[var(--color-ink)]">
-              Product & Costing Specification
-            </h2>
-            <p className="text-sm text-[var(--color-muted)]">
-              Configure product details, choose variants/colors, and build the 4-stage bill of materials.
-            </p>
+          <div className="flex items-center gap-3">
+            {initialProduct?.image_url && (
+              <div className="relative h-12 w-12 shrink-0 overflow-hidden rounded-lg border border-slate-200 bg-slate-100 shadow-xs">
+                <Image
+                  src={initialProduct.image_url}
+                  alt={name || "Product photo"}
+                  fill
+                  sizes="48px"
+                  className="object-cover"
+                  unoptimized
+                />
+              </div>
+            )}
+            <div>
+              <h2 className="text-lg font-bold text-[var(--color-ink)]">
+                Product & Costing Specification
+              </h2>
+              <p className="text-sm text-[var(--color-muted)]">
+                Standard format: [CATEGORY]/[0001]/[COLOR] (e.g. LC/0001/WL). Each product comes in 3 colors only (Walnut, Natural, Black).
+              </p>
+            </div>
           </div>
 
           <div className="flex items-center gap-3">
@@ -409,17 +464,62 @@ export function CostCalculatorView({
 
         <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <div>
-            <label className="label" htmlFor="calc-code">
-              Product Code *
-            </label>
+            <div className="flex items-center justify-between">
+              <label className="label" htmlFor="calc-code">
+                Product Code *
+              </label>
+              <button
+                type="button"
+                onClick={async () => {
+                  const cat = categories.find((c) => c.id === categoryId);
+                  const catCode = cat?.code || (cat ? deriveCategoryCode(cat.name) : "LC");
+                  const res = await getNextSerialAction(catCode);
+                  const col = selectedColors[0] || "Walnut";
+                  setCode(formatProductCode(catCode, res.serial || "0001", col));
+                }}
+                className="text-[11px] text-[var(--color-brand)] hover:underline"
+              >
+                Auto-generate
+              </button>
+            </div>
             <input
               id="calc-code"
               value={code}
-              onChange={(e) => setCode(e.target.value)}
-              placeholder="e.g. WB-001"
+              onChange={(e) => setCode(e.target.value.toUpperCase())}
+              placeholder="e.g. LC/0001/WL"
               required
-              className="input mt-1 font-mono uppercase"
+              className="input mt-1 font-mono uppercase font-semibold"
             />
+            <div className="mt-1 flex items-center justify-between text-xs">
+              <span
+                className={
+                  parsedCode.isValid ? "text-emerald-700 font-medium" : "text-amber-700"
+                }
+              >
+                {parsedCode.isValid
+                  ? `✓ ${parsedCode.categoryCode}/${parsedCode.serial}/${parsedCode.colorCode} (${parsedCode.colorName})`
+                  : `Format: LC/0001/WL`}
+              </span>
+            </div>
+          </div>
+
+          <div>
+            <label className="label" htmlFor="calc-category">
+              Product Master Category
+            </label>
+            <select
+              id="calc-category"
+              value={categoryId}
+              onChange={(e) => handleCategoryChange(e.target.value)}
+              className="select mt-1"
+            >
+              <option value="">No category</option>
+              {categories.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.code ? `[${c.code}] ` : ""}{c.name}
+                </option>
+              ))}
+            </select>
           </div>
 
           <div>
@@ -430,29 +530,10 @@ export function CostCalculatorView({
               id="calc-name"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="e.g. Wooden Dry Fruit Box"
+              placeholder="e.g. Lotus Glow (Pair)"
               required
               className="input mt-1"
             />
-          </div>
-
-          <div>
-            <label className="label" htmlFor="calc-category">
-              Product Master Category
-            </label>
-            <select
-              id="calc-category"
-              value={categoryId}
-              onChange={(e) => setCategoryId(e.target.value)}
-              className="select mt-1"
-            >
-              <option value="">No category</option>
-              {categories.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name}
-                </option>
-              ))}
-            </select>
           </div>
 
           <div>
@@ -472,24 +553,30 @@ export function CostCalculatorView({
         {/* Color Variants & Active status */}
         <div className="mt-4 flex flex-wrap items-center justify-between gap-4 border-t border-[var(--color-border)] pt-4">
           <div className="flex flex-wrap items-center gap-2">
-            <span className="text-xs font-semibold text-[var(--color-ink)]">
-              Product Colors:
+            <span className="text-xs font-semibold text-[var(--color-ink)] mr-1">
+              Color Finish (3 standard colors):
             </span>
-            {productColors.map((col) => {
-              const checked = selectedColors.includes(col);
+            {STANDARD_PRODUCT_COLORS.map((col) => {
+              const checked = selectedColors.includes(col.name);
               return (
                 <button
-                  key={col}
+                  key={col.code}
                   type="button"
-                  onClick={() => toggleColor(col)}
-                  className={`rounded-full px-3 py-1 text-xs font-medium transition-all ${
+                  onClick={() => handleColorSelect(col.name)}
+                  className={`flex items-center gap-2 rounded-full px-3 py-1 text-xs font-medium transition-all ${
                     checked
                       ? "bg-[var(--color-brand)] text-white shadow-sm ring-2 ring-[var(--color-brand)]/20"
                       : "bg-[var(--color-sheet)] text-[var(--color-muted)] hover:bg-slate-200"
                   }`}
                 >
-                  {checked ? "✓ " : "+ "}
-                  {col}
+                  <span
+                    className="inline-block h-2.5 w-2.5 rounded-full border border-black/20"
+                    style={{ backgroundColor: col.hex }}
+                  />
+                  <span>
+                    {col.name} ({col.code})
+                  </span>
+                  {checked && <span>✓</span>}
                 </button>
               );
             })}
@@ -1040,14 +1127,25 @@ export function CostCalculatorView({
             )}
           </div>
 
-          <button
-            type="button"
-            onClick={handleSave}
-            disabled={isPending}
-            className="btn-primary px-6 py-2.5 text-base font-bold shadow"
-          >
-            {isPending ? "Saving Costing…" : "Save to Product Master"}
-          </button>
+          <div className="flex flex-wrap items-center gap-3">
+            <button
+              type="button"
+              onClick={() => handleSave(false)}
+              disabled={isPending}
+              className="btn-primary px-5 py-2.5 text-sm font-bold shadow"
+            >
+              {isPending ? "Saving Costing…" : `Save Product (${code || "Primary"})`}
+            </button>
+            <button
+              type="button"
+              onClick={() => handleSave(true)}
+              disabled={isPending}
+              className="btn-secondary bg-emerald-50 text-[var(--color-brand-dark)] border-emerald-300 hover:bg-emerald-100 px-5 py-2.5 text-sm font-bold shadow-sm"
+              title="Creates or updates all 3 color codes: /WL, /NT, and /BL with identical costing"
+            >
+              Save All 3 Color Variants (WL, NT, BL)
+            </button>
+          </div>
         </div>
       </div>
     </div>

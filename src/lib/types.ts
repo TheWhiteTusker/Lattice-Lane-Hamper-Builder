@@ -19,9 +19,24 @@ export type Profile = {
 export type Category = {
   id: string;
   name: string;
+  code?: string | null;
   counts_as_item: boolean;
   sort_order: number;
   is_active: boolean;
+};
+
+export type ProductImage = {
+  id: string;
+  product_id: string;
+  url: string;
+  storage_path?: string | null;
+  color?: string | null; // e.g. "Walnut", "Natural", "Black" or null for General/All
+  color_code?: string | null; // e.g. "WL", "NT", "BL"
+  is_primary: boolean;
+  sort_order: number;
+  caption?: string | null;
+  created_at: string;
+  updated_at: string;
 };
 
 export type Product = {
@@ -35,6 +50,8 @@ export type Product = {
   target_margin: number;
   default_sp: number;
   colors?: string[];
+  image_url?: string | null;
+  images?: ProductImage[];
   is_active: boolean;
   created_at: string;
   updated_at: string;

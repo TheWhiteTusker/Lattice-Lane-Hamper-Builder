@@ -4,16 +4,21 @@ import type { ProductCostLine } from "./types";
 export type DimensionUnit = "inch" | "mm" | "cm";
 
 export const COMMON_UNITS = [
+  "inch",
+  "mm",
+  "cm",
+  "feet",
+  "meter",
   "sq ft",
   "sq inch",
   "sq mm",
-  "piece",
+  "sq cm",
   "running ft",
+  "piece",
+  "kg",
+  "set",
   "min",
   "hour",
-  "set",
-  "meter",
-  "kg",
 ] as const;
 
 export type UnitType = (typeof COMMON_UNITS)[number];
@@ -30,9 +35,67 @@ export function calculateDimensionArea(
   const l = num(lengthVal);
   const b = num(breadthVal);
 
-  if (l <= 0 || b <= 0) return 1;
-
   const unitLower = (targetUnit || "").trim().toLowerCase();
+
+  const isLinear = [
+    "feet",
+    "ft",
+    "running ft",
+    "rft",
+    "inch",
+    "in",
+    "mm",
+    "cm",
+    "meter",
+    "m",
+  ].includes(unitLower);
+
+  if (isLinear) {
+    if (l <= 0) return 1;
+
+    if (
+      unitLower === "feet" ||
+      unitLower === "ft" ||
+      unitLower === "running ft" ||
+      unitLower === "rft"
+    ) {
+      let lInches = l;
+      if (dimensionUnit === "mm") lInches = l / 25.4;
+      else if (dimensionUnit === "cm") lInches = l / 2.54;
+      return round2(lInches / 12);
+    }
+
+    if (unitLower === "inch" || unitLower === "in") {
+      let lInches = l;
+      if (dimensionUnit === "mm") lInches = l / 25.4;
+      else if (dimensionUnit === "cm") lInches = l / 2.54;
+      return round2(lInches);
+    }
+
+    if (unitLower === "mm") {
+      let lMm = l;
+      if (dimensionUnit === "inch") lMm = l * 25.4;
+      else if (dimensionUnit === "cm") lMm = l * 10;
+      return round2(lMm);
+    }
+
+    if (unitLower === "cm") {
+      let lCm = l;
+      if (dimensionUnit === "inch") lCm = l * 2.54;
+      else if (dimensionUnit === "mm") lCm = l / 10;
+      return round2(lCm);
+    }
+
+    if (unitLower === "meter" || unitLower === "m") {
+      let lMeters = l;
+      if (dimensionUnit === "cm") lMeters = l / 100;
+      else if (dimensionUnit === "mm") lMeters = l / 1000;
+      else if (dimensionUnit === "inch") lMeters = (l * 2.54) / 100;
+      return round2(lMeters);
+    }
+  }
+
+  if (l <= 0 || b <= 0) return 1;
 
   // Convert dimensions to inches first as a common baseline
   let lInches = l;
@@ -55,13 +118,35 @@ export function calculateDimensionArea(
   }
 
   if (unitLower === "sq mm" || unitLower === "sqmm") {
-    const lMm = dimensionUnit === "mm" ? l : lInches * 25.4;
-    const bMm = dimensionUnit === "mm" ? b : bInches * 25.4;
+    const lMm =
+      dimensionUnit === "mm"
+        ? l
+        : dimensionUnit === "cm"
+          ? l * 10
+          : lInches * 25.4;
+    const bMm =
+      dimensionUnit === "mm"
+        ? b
+        : dimensionUnit === "cm"
+          ? b * 10
+          : bInches * 25.4;
     return round2(lMm * bMm);
   }
 
-  if (unitLower === "running ft" || unitLower === "rft") {
-    return round2(lInches / 12);
+  if (unitLower === "sq cm" || unitLower === "sqcm") {
+    const lCm =
+      dimensionUnit === "cm"
+        ? l
+        : dimensionUnit === "mm"
+          ? l / 10
+          : lInches * 2.54;
+    const bCm =
+      dimensionUnit === "cm"
+        ? b
+        : dimensionUnit === "mm"
+          ? b / 10
+          : bInches * 2.54;
+    return round2(lCm * bCm);
   }
 
   // For piece / each / nos or other units, dimensions are descriptive rather than multiplying
@@ -96,21 +181,39 @@ export function calculateLineCost(line: Partial<ProductCostLine>): {
   const l = num(line.length);
   const b = num(line.breadth);
 
+  const isLinearUnit = [
+    "feet",
+    "ft",
+    "running ft",
+    "rft",
+    "inch",
+    "in",
+    "mm",
+    "cm",
+    "meter",
+    "m",
+  ].includes(unit.trim().toLowerCase());
+
   const isAreaUnit = [
     "sq ft",
     "sqft",
     "sft",
     "sq inch",
     "sq in",
+    "sqin",
     "sq mm",
-    "running ft",
-    "rft",
+    "sqmm",
+    "sq cm",
+    "sqcm",
   ].includes(unit.trim().toLowerCase());
 
   let area = 1;
   let baseCost = 0;
 
-  if (isAreaUnit && l > 0 && b > 0) {
+  if (isLinearUnit && l > 0) {
+    area = calculateDimensionArea(l, b, dimUnit, unit);
+    baseCost = area * rate * qty;
+  } else if (isAreaUnit && l > 0 && b > 0) {
     area = calculateDimensionArea(l, b, dimUnit, unit);
     baseCost = area * rate * qty;
   } else {

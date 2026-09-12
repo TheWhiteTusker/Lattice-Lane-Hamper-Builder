@@ -240,10 +240,19 @@ export function CategoryRow({ category }: { category: Category }) {
             <input type="hidden" name="sort_order" value={category.sort_order} />
 
             <input
+              name="code"
+              defaultValue={category.code ?? ""}
+              placeholder="Code"
+              aria-label="Category code"
+              className="input max-w-[70px] uppercase font-mono font-bold text-center text-xs"
+              title="2-letter category code used in product codes (e.g. LC, ED)"
+            />
+
+            <input
               name="name"
               defaultValue={category.name}
               aria-label="Category name"
-              className="input max-w-[240px]"
+              className="input max-w-[220px]"
             />
 
             <label className="flex items-center gap-1.5 text-sm whitespace-nowrap">
@@ -286,10 +295,18 @@ export function AddCategoryForm({ nextSortOrder }: { nextSortOrder: number }) {
       <input type="hidden" name="sort_order" value={nextSortOrder} />
 
       <input
+        name="code"
+        placeholder="Code (e.g. LC)"
+        aria-label="Category code"
+        className="input max-w-[90px] uppercase font-mono font-bold text-center text-xs"
+        title="2-letter category code used in product codes (e.g. LC, ED)"
+      />
+
+      <input
         name="name"
         placeholder="New category name"
         aria-label="New category name"
-        className="input max-w-[240px]"
+        className="input max-w-[220px]"
         required
       />
 

@@ -12,6 +12,7 @@ import {
   saveProductColors,
 } from "./actions";
 import { COMMON_UNITS } from "@/lib/costing.ts";
+import { STANDARD_PRODUCT_COLORS } from "@/lib/product-code";
 import type { CostStageWithHierarchy, CostVariety } from "@/lib/types";
 
 export function CostMasterView({
@@ -168,12 +169,42 @@ export function CostMasterView({
     <div className="space-y-6">
       {/* ---------------- PRODUCT COLORS MASTER CARD ---------------- */}
       <div className="card p-5">
-        <h3 className="text-base font-bold text-[var(--color-ink)]">
-          Product Colors & Finishes Master
-        </h3>
-        <p className="text-xs text-[var(--color-muted)] mt-0.5">
-          Define standard finish colors available for wooden & manufactured products (e.g. Walnut, Teak, Natural).
-        </p>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <h3 className="text-base font-bold text-[var(--color-ink)]">
+              Standard Product Colors & Finishes
+            </h3>
+            <p className="text-xs text-[var(--color-muted)] mt-0.5">
+              Each product comes strictly in 3 standard colors: <strong>Walnut (WL)</strong>, <strong>Natural (NT)</strong>, and <strong>Black (BL)</strong>.
+            </p>
+          </div>
+          <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-bold text-emerald-800 border border-emerald-200">
+            3 Standard Finishes
+          </span>
+        </div>
+
+        <div className="mt-4 grid gap-3 sm:grid-cols-3">
+          {STANDARD_PRODUCT_COLORS.map((c) => (
+            <div
+              key={c.code}
+              className="flex items-center gap-3 rounded-xl border border-slate-200 bg-white p-3 shadow-xs"
+            >
+              <span
+                className="h-7 w-7 rounded-full border border-black/20 shadow-xs shrink-0"
+                style={{ backgroundColor: c.hex }}
+              />
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-bold text-[var(--color-ink)]">{c.name}</span>
+                  <span className="rounded font-mono font-black text-xs bg-slate-100 px-1.5 py-0.5 text-slate-800">
+                    {c.code}
+                  </span>
+                </div>
+                <span className="text-[11px] text-[var(--color-muted)]">Code suffix: /{c.code}</span>
+              </div>
+            </div>
+          ))}
+        </div>
 
         <div className="mt-4 flex flex-wrap items-center gap-2">
           {colors.map((col) => (
@@ -182,14 +213,16 @@ export function CostMasterView({
               className="inline-flex items-center gap-1.5 rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-[var(--color-ink)] border border-slate-200"
             >
               {col}
-              <button
-                type="button"
-                onClick={() => handleRemoveColor(col)}
-                title={`Remove ${col}`}
-                className="ml-1 text-slate-400 hover:text-red-600 transition-colors"
-              >
-                &times;
-              </button>
+              {!["Walnut", "Natural", "Black"].includes(col) && (
+                <button
+                  type="button"
+                  onClick={() => handleRemoveColor(col)}
+                  title={`Remove ${col}`}
+                  className="ml-1 text-slate-400 hover:text-red-600 transition-colors"
+                >
+                  &times;
+                </button>
+              )}
             </span>
           ))}
         </div>
