@@ -24,12 +24,14 @@ import {
   getNextSerialAction,
   type SaveCostSheetPayload,
 } from "./actions";
+import { ProductImagesManager } from "@/components/product-images-manager";
 import type {
   Category,
   CostStageWithHierarchy,
   Product,
   ProductCostLine,
   ProductCostSheet,
+  ProductImage,
 } from "@/lib/types";
 
 type LineState = ProductCostLine & {
@@ -45,22 +47,25 @@ const createEmptyLine = (
   const firstVar = firstSub?.varieties[0];
 
   return {
+    id: crypto.randomUUID(),
+    sheet_id: "",
     tempKey: crypto.randomUUID(),
     stage_code: stageCode,
     category_name: firstCat?.name ?? "",
     subcategory_name: firstSub?.name ?? "",
     variety_name: firstVar?.name ?? "",
+    cost_variety_id: firstVar?.id ?? null,
     item_name:
       firstSub && firstVar ? `${firstSub.name} ${firstVar.name}` : firstSub?.name ?? "",
-    cost_variety_id: firstVar?.id ?? null,
-    length: stageCode === "machine" ? null : 12,
-    breadth: stageCode === "machine" ? null : 12,
+    length: null,
+    breadth: null,
     dimension_unit: "inch",
     unit: firstVar?.unit ?? (stageCode === "machine" ? "min" : "sq ft"),
-    rate: firstVar?.default_rate ?? (stageCode === "machine" ? 15 : 50),
-    duration_minutes: stageCode === "machine" ? 10 : null,
+    rate: firstVar?.default_rate ?? 0,
     qty: 1,
-    wastage_pct: firstVar?.default_wastage_pct ?? (stageCode === "machine" ? 5 : 10),
+    duration_minutes: stageCode === "machine" ? 15 : null,
+    wastage_pct: firstVar?.default_wastage_pct ?? 0,
+    sort_order: 0,
     calculated_area: 1,
     line_total: 0,
   };
@@ -72,6 +77,7 @@ export function CostCalculatorView({
   products,
   initialProduct,
   initialSheet,
+  initialImages = [],
 }: {
   stages: CostStageWithHierarchy[];
   categories: Category[];
@@ -79,6 +85,7 @@ export function CostCalculatorView({
   productColors?: string[];
   initialProduct?: Product | null;
   initialSheet?: ProductCostSheet | null;
+  initialImages?: ProductImage[];
 }) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -593,6 +600,23 @@ export function CostCalculatorView({
           </label>
         </div>
       </div>
+
+      {/* Product Photos & Color Finishes */}
+      {selectedProductId ? (
+        <div className="card p-5 shadow-sm">
+          <ProductImagesManager
+            key={selectedProductId}
+            productId={selectedProductId}
+            initialImages={initialImages}
+            productName={name}
+            currentColor={parsedCode.colorName || selectedColors[0] || "Walnut"}
+          />
+        </div>
+      ) : (
+        <div className="card p-4 border-dashed bg-slate-50/60 text-center text-xs text-[var(--color-muted)]">
+          Save this product first to upload and manage photos for Walnut, Natural, and Black finishes.
+        </div>
+      )}
 
       {/* ---------------- STAGE SECTIONS ---------------- */}
       {stages.map((stage) => {

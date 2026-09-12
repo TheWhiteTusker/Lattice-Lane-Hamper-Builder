@@ -14,6 +14,7 @@ import type {
   Product,
   ProductCostLine,
   ProductCostSheet,
+  ProductImage,
 } from "@/lib/types";
 
 type Search = Promise<Record<string, string | string[] | undefined>>;
@@ -123,6 +124,7 @@ export default async function CostCalculatorPage({
   // If a product is requested, load the product and its cost sheet + lines
   let initialProduct: Product | null = null;
   let initialSheet: (ProductCostSheet & { lines: ProductCostLine[] }) | null = null;
+  let initialImages: ProductImage[] = [];
 
   if (productQuery) {
     const { data: prod } = await supabase
@@ -133,11 +135,22 @@ export default async function CostCalculatorPage({
 
     if (prod) {
       initialProduct = prod;
-      const { data: sheet } = await supabase
-        .from("product_cost_sheets")
-        .select("*")
-        .eq("product_id", prod.id)
-        .maybeSingle<ProductCostSheet>();
+      const [{ data: sheet }, { data: imgData }] = await Promise.all([
+        supabase
+          .from("product_cost_sheets")
+          .select("*")
+          .eq("product_id", prod.id)
+          .maybeSingle<ProductCostSheet>(),
+        supabase
+          .from("product_images")
+          .select("*")
+          .eq("product_id", prod.id)
+          .order("sort_order")
+          .order("created_at")
+          .returns<ProductImage[]>(),
+      ]);
+
+      initialImages = imgData ?? [];
 
       if (sheet) {
         const { data: lines } = await supabase
@@ -197,6 +210,7 @@ export default async function CostCalculatorPage({
           productColors={settings.product_colors ?? ["Walnut", "Natural", "Teak"]}
           initialProduct={initialProduct}
           initialSheet={initialSheet}
+          initialImages={initialImages}
         />
       ) : (
         <CostMasterView

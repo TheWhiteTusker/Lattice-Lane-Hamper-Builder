@@ -129,25 +129,46 @@ export default async function ProductsPage({ searchParams }: { searchParams: Sea
                 <tr key={p.id} className={p.is_active ? "" : "opacity-55"}>
                   <td className="w-12 py-1.5 px-2 text-center">
                     {p.image_url ? (
-                      <div className="relative mx-auto h-9 w-9 overflow-hidden rounded-md border border-slate-200 bg-slate-100 shadow-2xs">
-                        <Image
-                          src={p.image_url}
-                          alt={p.name}
-                          fill
-                          sizes="36px"
-                          className="object-cover"
-                          unoptimized
-                        />
-                      </div>
+                      <Link
+                        href={`/products/${encodeURIComponent(p.code)}`}
+                        title={`View/edit photos for ${p.name}`}
+                      >
+                        <div className="relative mx-auto h-9 w-9 overflow-hidden rounded-md border border-slate-200 bg-slate-100 shadow-2xs hover:ring-2 hover:ring-[var(--color-brand)] transition-all">
+                          <Image
+                            src={p.image_url}
+                            alt={p.name}
+                            fill
+                            sizes="36px"
+                            className="object-cover"
+                            unoptimized
+                          />
+                        </div>
+                      </Link>
                     ) : (
-                      <div className="mx-auto flex h-9 w-9 items-center justify-center rounded-md border border-dashed border-slate-200 bg-slate-50 text-[9px] font-bold text-slate-300">
-                        IMG
-                      </div>
+                      <Link
+                        href={`/products/${encodeURIComponent(p.code)}`}
+                        title={`Add photos for ${p.name}`}
+                        className="mx-auto flex h-9 w-9 items-center justify-center rounded-md border border-dashed border-slate-300 bg-slate-50 text-[10px] font-semibold text-slate-400 hover:border-[var(--color-brand)] hover:text-[var(--color-brand)] transition-colors"
+                      >
+                        + Pic
+                      </Link>
                     )}
                   </td>
-                  <td className="font-mono whitespace-nowrap">{p.code}</td>
+                  <td className="font-mono whitespace-nowrap">
+                    <Link
+                      href={`/products/${encodeURIComponent(p.code)}`}
+                      className="font-semibold text-[var(--color-ink)] hover:text-[var(--color-brand)] hover:underline"
+                    >
+                      {p.code}
+                    </Link>
+                  </td>
                   <td>
-                    {p.name}
+                    <Link
+                      href={`/products/${encodeURIComponent(p.code)}`}
+                      className="font-medium hover:underline text-[var(--color-ink)]"
+                    >
+                      {p.name}
+                    </Link>
                     {!p.is_active && <span className="badge ml-2">Inactive</span>}
                   </td>
                   <td className="text-[var(--color-muted)]">{p.categories?.name ?? "—"}</td>
@@ -167,9 +188,9 @@ export default async function ProductsPage({ searchParams }: { searchParams: Sea
                       {admin && (
                         <Link
                           href={`/products/${encodeURIComponent(p.code)}`}
-                          className="text-[var(--color-muted)] hover:text-[var(--color-ink)] hover:underline"
+                          className="font-medium text-[var(--color-ink)] hover:text-[var(--color-brand)] hover:underline"
                         >
-                          Edit
+                          Photos & Edit
                         </Link>
                       )}
                     </div>
