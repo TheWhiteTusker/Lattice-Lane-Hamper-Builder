@@ -283,7 +283,10 @@ export function calculateCostSheetTotals(
   );
 
   const mPct = num(markupPct);
-  const calculated_sp = round2(total_cost * (1 + mPct / 100));
+  // SP = CP / (1 - markup% / 100). A markup of 100% or more has no finite
+  // selling price, so it falls back to cost price rather than Infinity/NaN.
+  const divisor = 1 - mPct / 100;
+  const calculated_sp = divisor > 0 ? round2(total_cost / divisor) : total_cost;
   const target_margin = calculated_sp > 0 ? (calculated_sp - total_cost) / calculated_sp : 0;
 
   return {

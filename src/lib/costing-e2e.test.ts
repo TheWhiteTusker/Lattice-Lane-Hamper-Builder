@@ -100,8 +100,8 @@ test("full workflow: user adds birch material, cylinder magnet hardware, PU poli
   assert.equal(line5.calculated_area, 12);
   assert.equal(line5.line_total, 151.2);
 
-  // Grand totals with 120% markup
-  const totals = calculateCostSheetTotals(lines, 120);
+  // Grand totals with 55% markup
+  const totals = calculateCostSheetTotals(lines, 55);
 
   // Material: 104.72 + 33.88 = 138.6
   assert.equal(totals.material_total, 138.6);
@@ -115,9 +115,9 @@ test("full workflow: user adds birch material, cylinder magnet hardware, PU poli
   // Total Cost Price: 138.6 + 20 + 55.13 + 151.2 = 364.93
   assert.equal(totals.total_cost, 364.93);
 
-  // Selling Price with 120% markup: 364.93 * 2.2 = 802.85
-  assert.equal(totals.calculated_sp, 802.85);
+  // Selling Price with 55% markup: 364.93 / (1 - 0.55) = 810.96
+  assert.equal(totals.calculated_sp, 810.96);
 
-  // Target Margin: (802.85 - 364.93) / 802.85 = 54.5%
+  // Target Margin equals the markup under this formula: 55%
   assert.equal(totals.target_margin, 0.55);
 });

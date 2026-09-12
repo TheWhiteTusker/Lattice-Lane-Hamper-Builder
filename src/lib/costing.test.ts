@@ -192,15 +192,15 @@ test("calculateCostSheetTotals aggregates all stages and applies markup", () => 
   // Finishing: 35
   // Machine: 189
   // Total Cost = 451
-  // Markup 100% -> SP = 451 * 2 = 902
-  const totals = calculateCostSheetTotals(lines, 100);
+  // Markup 50% -> SP = 451 / (1 - 0.5) = 902
+  const totals = calculateCostSheetTotals(lines, 50);
 
   assert.equal(totals.material_total, 187);
   assert.equal(totals.hardware_total, 40);
   assert.equal(totals.finishing_total, 35);
   assert.equal(totals.machine_total, 189);
   assert.equal(totals.total_cost, 451);
-  assert.equal(totals.markup_pct, 100);
+  assert.equal(totals.markup_pct, 50);
   assert.equal(totals.calculated_sp, 902);
   assert.equal(totals.target_margin, 0.5); // 50% margin
 });
@@ -215,10 +215,32 @@ test("miscellaneous and bought-out lines roll into total cost", () => {
     { stage_code: "bought_out", unit: "piece", rate: 200, qty: 1, wastage_pct: 25 },
   ];
 
-  const totals = calculateCostSheetTotals(lines, 100);
+  const totals = calculateCostSheetTotals(lines, 50);
 
   assert.equal(totals.material_total, 100);
   assert.equal(totals.other_total, 350); // 100 misc + 250 bought out
   assert.equal(totals.total_cost, 450);
-  assert.equal(totals.calculated_sp, 900);
+  assert.equal(totals.calculated_sp, 900); // 450 / (1 - 0.5)
+});
+
+test("SP = CP / (1 - markup%), and 100%+ markup falls back to cost price", () => {
+  const lines = [
+    { stage_code: "material", unit: "piece", rate: 600, qty: 1, wastage_pct: 0 },
+  ];
+
+  // 40% markup on 600 -> 600 / 0.6 = 1000, margin 40%
+  const forty = calculateCostSheetTotals(lines, 40);
+  assert.equal(forty.total_cost, 600);
+  assert.equal(forty.calculated_sp, 1000);
+  assert.equal(forty.target_margin, 0.4);
+
+  // 0% markup sells at cost
+  assert.equal(calculateCostSheetTotals(lines, 0).calculated_sp, 600);
+
+  // No finite price at or above 100% - must not be Infinity or NaN
+  for (const bad of [100, 150]) {
+    const sp = calculateCostSheetTotals(lines, bad).calculated_sp;
+    assert.ok(Number.isFinite(sp), `markup ${bad}% produced ${sp}`);
+    assert.equal(sp, 600);
+  }
 });

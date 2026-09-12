@@ -132,7 +132,7 @@ export function CostCalculatorView({
       ? String(initialProduct.markup_pct)
       : initialSheet?.markup_pct != null
         ? String(initialSheet.markup_pct)
-        : "100",
+        : "50",
   );
   const [manualSp, setManualSp] = useState<string>(
     initialProduct?.default_sp != null
@@ -174,7 +174,7 @@ export function CostCalculatorView({
       setCategoryId("");
       setSelectedColors(["Walnut"]);
       setIsActive(true);
-      setMarkupPct("100");
+      setMarkupPct("50");
       setManualSp("");
       return;
     }
@@ -190,7 +190,7 @@ export function CostCalculatorView({
       );
       setSelectedColors(prod.colors ?? []);
       setIsActive(prod.is_active);
-      const mPct = prod.markup_pct != null ? String(prod.markup_pct) : "100";
+      const mPct = prod.markup_pct != null ? String(prod.markup_pct) : "50";
       setMarkupPct(mPct);
       setManualSp(String(prod.default_sp));
       router.push(`/cost-calculator?product=${encodeURIComponent(prod.code)}`);
@@ -369,8 +369,10 @@ export function CostCalculatorView({
   function handleMarkupChange(val: string) {
     setMarkupPct(val);
     const m = num(val);
-    const newSp = round2(totals.total_cost * (1 + m / 100));
-    setManualSp(String(newSp));
+    const divisor = 1 - m / 100;
+    // 100%+ has no finite SP; leave the price alone rather than show Infinity
+    if (divisor <= 0) return;
+    setManualSp(String(round2(totals.total_cost / divisor)));
   }
 
   // Handle manual Selling Price change
@@ -378,7 +380,7 @@ export function CostCalculatorView({
     setManualSp(val);
     const sp = num(val);
     if (totals.total_cost > 0 && sp > 0) {
-      const derivedMarkup = round2(((sp - totals.total_cost) / totals.total_cost) * 100);
+      const derivedMarkup = round2(((sp - totals.total_cost) / sp) * 100);
       setMarkupPct(String(derivedMarkup));
     }
   }
@@ -1329,8 +1331,13 @@ export function CostCalculatorView({
               <span className="text-base font-bold text-[var(--color-muted)]">%</span>
             </div>
             <p className="mt-1 text-[11px] text-[var(--color-muted)]">
-              Selling Price = CP &times; (1 + Markup%)
+              Selling Price = CP &divide; (1 &minus; Markup%)
             </p>
+            {num(markupPct) >= 100 && (
+              <p className="mt-1 text-[11px] font-semibold text-red-600">
+                Markup must be under 100% — at 100% the formula has no finite price.
+              </p>
+            )}
           </div>
 
           <div className="rounded-xl border border-[var(--color-brand)] bg-emerald-50/40 p-4 shadow-sm">
