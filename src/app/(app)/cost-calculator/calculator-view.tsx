@@ -38,6 +38,9 @@ type LineState = ProductCostLine & {
   tempKey: string;
 };
 
+const ORIGINS = ["In-house", "Outsource", "Hybrid"] as const;
+const BOUGHT_OUT = "bought_out";
+
 const createEmptyLine = (
   stageCode: string,
   categories: CostStageWithHierarchy["categories"],
@@ -60,7 +63,9 @@ const createEmptyLine = (
     length: null,
     breadth: null,
     dimension_unit: "inch",
-    unit: firstVar?.unit ?? (stageCode === "machine" ? "min" : "sq ft"),
+    unit:
+      firstVar?.unit ??
+      (stageCode === "machine" ? "min" : categories.length > 0 ? "sq ft" : "piece"),
     rate: firstVar?.default_rate ?? 0,
     qty: 1,
     duration_minutes: stageCode === "machine" ? 15 : null,
@@ -103,7 +108,16 @@ export function CostCalculatorView({
   const [categoryId, setCategoryId] = useState<string>(
     initialProduct?.category_id ?? "",
   );
-  const [source, setSource] = useState<string>(initialProduct?.source ?? "In-house");
+  const [source, setSource] = useState<string>(() => {
+    const raw = initialProduct?.source ?? "In-house";
+    return ORIGINS.find((o) => o.toLowerCase() === raw.toLowerCase()) ?? "In-house";
+  });
+  // Stage codes whose line table is hidden. Outsource collapses everything.
+  const [collapsedStages, setCollapsedStages] = useState<Set<string>>(() =>
+    (initialProduct?.source ?? "").toLowerCase() === "outsource"
+      ? new Set(stages.map((s) => s.code))
+      : new Set(),
+  );
   const [selectedColors, setSelectedColors] = useState<string[]>(
     initialProduct?.colors ?? ["Walnut"],
   );
@@ -170,7 +184,10 @@ export function CostCalculatorView({
       setCode(prod.code);
       setName(prod.name);
       setCategoryId(prod.category_id ?? "");
-      setSource(prod.source ?? "In-house");
+      handleOriginChange(
+        ORIGINS.find((o) => o.toLowerCase() === (prod.source ?? "").toLowerCase()) ??
+          "In-house",
+      );
       setSelectedColors(prod.colors ?? []);
       setIsActive(prod.is_active);
       const mPct = prod.markup_pct != null ? String(prod.markup_pct) : "100";
@@ -178,6 +195,23 @@ export function CostCalculatorView({
       setManualSp(String(prod.default_sp));
       router.push(`/cost-calculator?product=${encodeURIComponent(prod.code)}`);
     }
+  }
+
+  // Product Origin drives which sections are shown and whether they start collapsed
+  function handleOriginChange(origin: string) {
+    setSource(origin);
+    setCollapsedStages(
+      origin === "Outsource" ? new Set(stages.map((s) => s.code)) : new Set(),
+    );
+  }
+
+  function toggleStage(stageCode: string) {
+    setCollapsedStages((prev) => {
+      const next = new Set(prev);
+      if (next.has(stageCode)) next.delete(stageCode);
+      else next.add(stageCode);
+      return next;
+    });
   }
 
   // Update line field
@@ -301,10 +335,30 @@ export function CostCalculatorView({
     setLines((prev) => [...prev, newLine]);
   }
 
+  // Bought-out items (Hybrid only): a finished item purchased in, priced
+  // rate x qty x (1 + markup%). wastage_pct carries the markup - same maths.
+  function addBoughtOutLine() {
+    setLines((prev) => [
+      ...prev,
+      { ...createEmptyLine(BOUGHT_OUT, []), category_name: "Bought Out" },
+    ]);
+  }
+
+  // Bought-out lines only count while the product origin is Hybrid, so
+  // switching origin does not silently keep charging for them.
+  const boughtOutLines = lines.filter((l) => l.stage_code === BOUGHT_OUT);
+  const activeLines = useMemo(
+    () =>
+      source !== "In-house"
+        ? lines
+        : lines.filter((l) => l.stage_code !== BOUGHT_OUT),
+    [lines, source],
+  );
+
   // Real-time totals
   const totals = useMemo(() => {
-    return calculateCostSheetTotals(lines, num(markupPct));
-  }, [lines, markupPct]);
+    return calculateCostSheetTotals(activeLines, num(markupPct));
+  }, [activeLines, markupPct]);
 
   // Derived selling price
   const effectiveSp = manualSp ? num(manualSp) : totals.calculated_sp;
@@ -386,7 +440,7 @@ export function CostCalculatorView({
         sellingPrice: effectiveSp,
         notes: notes.trim() || null,
         createAllColorVariants: allVariants,
-        lines: lines.map((l) => ({
+        lines: activeLines.map((l) => ({
           stage_code: l.stage_code,
           category_name: l.category_name,
           subcategory_name: l.subcategory_name,
@@ -545,15 +599,27 @@ export function CostCalculatorView({
 
           <div>
             <label className="label" htmlFor="calc-source">
-              Source / Vendor
+              Product Origin
             </label>
-            <input
+            <select
               id="calc-source"
               value={source}
-              onChange={(e) => setSource(e.target.value)}
-              placeholder="In-house / Vendor"
-              className="input mt-1"
-            />
+              onChange={(e) => handleOriginChange(e.target.value)}
+              className="select mt-1"
+            >
+              {ORIGINS.map((o) => (
+                <option key={o} value={o}>
+                  {o}
+                </option>
+              ))}
+            </select>
+            <p className="mt-1 text-[11px] text-[var(--color-muted)]">
+              {source === "In-house"
+                ? "All 5 cost stages apply."
+                : source === "Outsource"
+                  ? "Stages start collapsed — cost the vendor price under Bought Out Items below."
+                  : "In-house stages plus bought-out items with their own markup."}
+            </p>
           </div>
         </div>
 
@@ -623,12 +689,27 @@ export function CostCalculatorView({
         const stageLines = lines.filter((l) => l.stage_code === stage.code);
         const stageSubtotal = stageLines.reduce((acc, l) => acc + l.line_total, 0);
         const isMachine = stage.code === "machine";
+        // Stages with no categories configured (Miscellaneous) take a free-text
+        // description instead of the Category -> Subcategory -> Variety selects.
+        const hasCats = stage.categories.length > 0;
+        const isCollapsed = collapsedStages.has(stage.code);
+        const colCount =
+          (hasCats ? 3 : 1) + (isMachine ? 1 : 3) + 1 + (isMachine ? 0 : 1) + 4;
 
         return (
           <div key={stage.id} className="card overflow-hidden shadow-sm">
             {/* Stage Header */}
             <div className="flex flex-wrap items-center justify-between gap-2 bg-[var(--color-sheet)] px-4 py-3 border-b border-[var(--color-border)]">
               <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => toggleStage(stage.code)}
+                  aria-expanded={!isCollapsed}
+                  title={isCollapsed ? `Expand ${stage.name}` : `Collapse ${stage.name}`}
+                  className="flex h-6 w-6 items-center justify-center rounded border border-[var(--color-border)] bg-white text-sm font-bold leading-none text-[var(--color-brand-dark)] shadow-xs transition-colors hover:bg-emerald-50"
+                >
+                  {isCollapsed ? "+" : "−"}
+                </button>
                 <span className="flex h-7 w-7 items-center justify-center rounded-full bg-[var(--color-brand)] text-xs font-bold text-white">
                   {stage.sort_order}
                 </span>
@@ -636,9 +717,13 @@ export function CostCalculatorView({
                   {stage.name}
                 </h3>
                 <span className="text-xs text-[var(--color-muted)]">
-                  {isMachine
-                    ? "(Billed per minute of machine operation)"
-                    : "(Category → Subcategory → Variety, dimensions & wastage)"}
+                  {isCollapsed
+                    ? `(Collapsed — ${stageLines.length} line${stageLines.length === 1 ? "" : "s"}, click + to edit)`
+                    : isMachine
+                      ? "(Billed per minute of machine operation)"
+                      : hasCats
+                        ? "(Category → Subcategory → Variety, dimensions & wastage)"
+                        : "(Free-text description, rate & quantity)"}
                 </span>
               </div>
 
@@ -651,13 +736,21 @@ export function CostCalculatorView({
             </div>
 
             {/* Lines Table */}
+            {!isCollapsed && (
+            <>
             <div className="overflow-x-auto p-2">
               <table className="w-full text-left text-xs">
                 <thead>
                   <tr className="border-b border-[var(--color-border)] text-[var(--color-muted)] font-semibold">
-                    <th className="p-2 min-w-[130px]">Category</th>
-                    <th className="p-2 min-w-[130px]">Subcategory</th>
-                    <th className="p-2 min-w-[120px]">Variety</th>
+                    {hasCats ? (
+                      <>
+                        <th className="p-2 min-w-[130px]">Category</th>
+                        <th className="p-2 min-w-[130px]">Subcategory</th>
+                        <th className="p-2 min-w-[120px]">Variety</th>
+                      </>
+                    ) : (
+                      <th className="p-2 min-w-[260px]">Description</th>
+                    )}
                     {!isMachine && (
                       <>
                         <th className="p-2 min-w-[85px]">Length</th>
@@ -682,7 +775,7 @@ export function CostCalculatorView({
                   {stageLines.length === 0 ? (
                     <tr>
                       <td
-                        colSpan={isMachine ? 8 : 12}
+                        colSpan={colCount}
                         className="py-6 text-center text-sm text-[var(--color-muted)]"
                       >
                         No lines added for {stage.name}. Click &ldquo;+ Add Line&rdquo; below to start.
@@ -705,71 +798,87 @@ export function CostCalculatorView({
                           key={line.tempKey}
                           className="hover:bg-slate-50/75 transition-colors"
                         >
+                          {hasCats ? (
+                            <>
                           {/* 1. Category select */}
-                          <td className="p-2">
-                            <select
-                              value={line.category_name}
-                              onChange={(e) =>
-                                handleLineCategoryChange(
-                                  line.tempKey,
-                                  stage.code,
-                                  e.target.value,
-                                )
-                              }
-                              className="select text-xs py-1 px-2"
-                            >
-                              {stage.categories.map((c) => (
-                                <option key={c.id} value={c.name}>
-                                  {c.name}
-                                </option>
-                              ))}
-                            </select>
-                          </td>
-
-                          {/* 2. Subcategory select (e.g. Birch, Acacia) */}
-                          <td className="p-2">
-                            <select
-                              value={line.subcategory_name ?? ""}
-                              onChange={(e) =>
-                                handleLineSubcategoryChange(
-                                  line.tempKey,
-                                  stage.code,
-                                  line.category_name,
-                                  e.target.value,
-                                )
-                              }
-                              className="select text-xs py-1 px-2 font-medium"
-                            >
-                              {availableSubcategories.map((s) => (
-                                <option key={s.id} value={s.name}>
-                                  {s.name}
-                                </option>
-                              ))}
-                            </select>
-                          </td>
-
-                          {/* 3. Variety select (e.g. 8mm, 12mm) */}
-                          <td className="p-2">
-                            <select
-                              value={line.variety_name ?? ""}
-                              onChange={(e) =>
-                                handleLineVarietyChange(
-                                  line.tempKey,
-                                  stage.code,
-                                  line.category_name,
-                                  line.subcategory_name ?? "",
-                                  e.target.value,
-                                )
-                              }
-                              className="select text-xs py-1 px-2 font-semibold text-[var(--color-brand-dark)]"
-                            >
-                              {availableVarieties.map((v) => (
-                                <option key={v.id} value={v.name}>
-                                  {v.name}
-                                </option>
-                              ))}
-                            </select>
-                          </td>
+                            <td className="p-2">
+                              <select
+                                value={line.category_name}
+                                onChange={(e) =>
+                                  handleLineCategoryChange(
+                                    line.tempKey,
+                                    stage.code,
+                                    e.target.value,
+                                  )
+                                }
+                                className="select text-xs py-1 px-2"
+                              >
+                                {stage.categories.map((c) => (
+                                  <option key={c.id} value={c.name}>
+                                    {c.name}
+                                  </option>
+                                ))}
+                              </select>
+                            </td>
+  
+                            {/* 2. Subcategory select (e.g. Birch, Acacia) */}
+                            <td className="p-2">
+                              <select
+                                value={line.subcategory_name ?? ""}
+                                onChange={(e) =>
+                                  handleLineSubcategoryChange(
+                                    line.tempKey,
+                                    stage.code,
+                                    line.category_name,
+                                    e.target.value,
+                                  )
+                                }
+                                className="select text-xs py-1 px-2 font-medium"
+                              >
+                                {availableSubcategories.map((s) => (
+                                  <option key={s.id} value={s.name}>
+                                    {s.name}
+                                  </option>
+                                ))}
+                              </select>
+                            </td>
+  
+                            {/* 3. Variety select (e.g. 8mm, 12mm) */}
+                            <td className="p-2">
+                              <select
+                                value={line.variety_name ?? ""}
+                                onChange={(e) =>
+                                  handleLineVarietyChange(
+                                    line.tempKey,
+                                    stage.code,
+                                    line.category_name,
+                                    line.subcategory_name ?? "",
+                                    e.target.value,
+                                  )
+                                }
+                                className="select text-xs py-1 px-2 font-semibold text-[var(--color-brand-dark)]"
+                              >
+                                {availableVarieties.map((v) => (
+                                  <option key={v.id} value={v.name}>
+                                    {v.name}
+                                  </option>
+                                ))}
+                              </select>
+                            </td>
+                            </>
+                          ) : (
+                            /* Free-text description for category-less stages (Miscellaneous) */
+                            <td className="p-2">
+                              <input
+                                value={line.item_name}
+                                onChange={(e) =>
+                                  updateLine(line.tempKey, { item_name: e.target.value })
+                                }
+                                placeholder="e.g. Courier packaging, ribbon, gift tag"
+                                className="input text-xs py-1 px-2"
+                              />
+                            </td>
+                          )}
 
                           {/* Dimensions for Material, Hardware, Finishing */}
                           {!isMachine && (
@@ -961,9 +1070,152 @@ export function CostCalculatorView({
                 + Add {stage.name} Line
               </button>
             </div>
+            </>
+            )}
           </div>
         );
       })}
+
+      {/* ---------------- BOUGHT OUT ITEMS (HYBRID ONLY) ---------------- */}
+      {source !== "In-house" && (
+        <div className="card overflow-hidden shadow-sm">
+          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[var(--color-border)] bg-[var(--color-sheet)] px-4 py-3">
+            <div className="flex items-center gap-3">
+              <span className="flex h-7 w-7 items-center justify-center rounded-full bg-amber-600 text-xs font-bold text-white">
+                B
+              </span>
+              <h3 className="text-base font-semibold text-[var(--color-ink)]">
+                Bought Out Items
+              </h3>
+              <span className="text-xs text-[var(--color-muted)]">
+                (Finished items purchased in — Cost Price = Rate × Qty × (1 + Markup%))
+              </span>
+            </div>
+            <div className="flex items-center gap-3">
+              <span className="text-xs text-[var(--color-muted)]">Bought Out Total:</span>
+              <span className="rounded-lg bg-white px-2.5 py-1 font-mono text-sm font-bold text-[var(--color-brand-dark)] shadow-sm">
+                {formatMoney(boughtOutLines.reduce((acc, l) => acc + l.line_total, 0))}
+              </span>
+            </div>
+          </div>
+
+          <div className="overflow-x-auto p-2">
+            <table className="w-full text-left text-xs">
+              <thead>
+                <tr className="border-b border-[var(--color-border)] font-semibold text-[var(--color-muted)]">
+                  <th className="p-2 min-w-[240px]">Material Name</th>
+                  <th className="p-2 min-w-[95px]">Rate</th>
+                  <th className="p-2 min-w-[110px]">Unit</th>
+                  <th className="p-2 min-w-[70px]">Qty</th>
+                  <th className="p-2 min-w-[90px]">Markup %</th>
+                  <th className="p-2 min-w-[110px] text-right">Cost Price</th>
+                  <th className="p-2 min-w-[70px] text-center">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-[var(--color-border)]">
+                {boughtOutLines.length === 0 ? (
+                  <tr>
+                    <td
+                      colSpan={7}
+                      className="py-6 text-center text-sm text-[var(--color-muted)]"
+                    >
+                      No bought-out items. Click &ldquo;+ Add Bought Out Item&rdquo; below to start.
+                    </td>
+                  </tr>
+                ) : (
+                  boughtOutLines.map((line) => (
+                    <tr key={line.tempKey} className="transition-colors hover:bg-slate-50/75">
+                      <td className="p-2">
+                        <input
+                          value={line.item_name}
+                          onChange={(e) =>
+                            updateLine(line.tempKey, { item_name: e.target.value })
+                          }
+                          placeholder="e.g. Ceramic diffuser bottle"
+                          className="input text-xs py-1 px-2"
+                        />
+                      </td>
+                      <td className="p-2">
+                        <input
+                          type="number"
+                          step="any"
+                          value={line.rate}
+                          onChange={(e) =>
+                            updateLine(line.tempKey, { rate: Number(e.target.value) })
+                          }
+                          className="input input-num text-xs py-1 px-2 font-mono"
+                        />
+                      </td>
+                      <td className="p-2">
+                        <select
+                          value={line.unit}
+                          onChange={(e) => updateLine(line.tempKey, { unit: e.target.value })}
+                          className="select text-xs py-1 px-2"
+                        >
+                          {COMMON_UNITS.filter((u) => u !== "min" && u !== "hour").map((u) => (
+                            <option key={u} value={u}>
+                              {u}
+                            </option>
+                          ))}
+                        </select>
+                      </td>
+                      <td className="p-2">
+                        <input
+                          type="number"
+                          min="0"
+                          step="any"
+                          value={line.qty}
+                          onChange={(e) =>
+                            updateLine(line.tempKey, { qty: Number(e.target.value) })
+                          }
+                          className="input input-num text-xs py-1 px-2"
+                        />
+                      </td>
+                      <td className="p-2">
+                        <input
+                          type="number"
+                          min="0"
+                          step="any"
+                          value={line.wastage_pct}
+                          onChange={(e) =>
+                            updateLine(line.tempKey, {
+                              wastage_pct: Number(e.target.value),
+                            })
+                          }
+                          className="input input-num text-xs py-1 px-2"
+                        />
+                      </td>
+                      <td className="p-2 text-right font-mono font-semibold text-[var(--color-ink)]">
+                        {formatMoney(line.line_total)}
+                      </td>
+                      <td className="p-2 text-center">
+                        <button
+                          type="button"
+                          onClick={() => removeLine(line.tempKey)}
+                          title="Remove item"
+                          className="rounded px-1.5 py-1 text-[11px] font-semibold text-red-600 transition-colors hover:bg-red-50"
+                        >
+                          &times;
+                        </button>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          <div className="border-t border-[var(--color-border)] bg-slate-50/50 p-2 text-right">
+            <button
+              type="button"
+              onClick={addBoughtOutLine}
+              className="btn-secondary text-xs py-1 px-3"
+            >
+              + Add Bought Out Item
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* ---------------- SUMMARY BREAKDOWN & PRICING PANEL ---------------- */}
       <div className="card p-5 bg-gradient-to-br from-white to-slate-50 border-2 border-[var(--color-brand)]/20 shadow-md">
@@ -1003,6 +1255,13 @@ export function CostCalculatorView({
                 className="bg-teal-600"
                 title={`Machine: ${formatMoney(totals.machine_total)}`}
               />
+              <div
+                style={{
+                  width: `${(totals.other_total / totals.total_cost) * 100}%`,
+                }}
+                className="bg-amber-400"
+                title={`Misc & Bought Out: ${formatMoney(totals.other_total)}`}
+              />
             </div>
             <div className="mt-2 flex flex-wrap gap-4 text-xs">
               <span className="flex items-center gap-1.5">
@@ -1025,6 +1284,13 @@ export function CostCalculatorView({
                 Machine: {formatMoney(totals.machine_total)} (
                 {formatPct(totals.machine_total / totals.total_cost, 0)})
               </span>
+              {totals.other_total > 0 && (
+                <span className="flex items-center gap-1.5">
+                  <span className="h-2.5 w-2.5 rounded-full bg-amber-400" />
+                  Misc &amp; Bought Out: {formatMoney(totals.other_total)} (
+                  {formatPct(totals.other_total / totals.total_cost, 0)})
+                </span>
+              )}
             </div>
           </div>
         )}
@@ -1039,7 +1305,8 @@ export function CostCalculatorView({
               {formatMoney(totals.total_cost)}
             </div>
             <p className="mt-1 text-[11px] text-[var(--color-muted)]">
-              Sum of Material + HW + Finishing + Machine
+              Sum of Material + HW + Finishing + Machine + Misc
+              {source !== "In-house" ? " + Bought Out" : ""}
             </p>
           </div>
 

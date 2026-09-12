@@ -204,3 +204,21 @@ test("calculateCostSheetTotals aggregates all stages and applies markup", () => 
   assert.equal(totals.calculated_sp, 902);
   assert.equal(totals.target_margin, 0.5); // 50% margin
 });
+
+test("miscellaneous and bought-out lines roll into total cost", () => {
+  const lines = [
+    // Material: 100 x 1, no wastage
+    { stage_code: "material", unit: "piece", rate: 100, qty: 1, wastage_pct: 0 },
+    // Miscellaneous: free-text line, 50 x 2 = 100
+    { stage_code: "miscellaneous", unit: "piece", rate: 50, qty: 2, wastage_pct: 0 },
+    // Bought out: 200 x 1 with 25% markup carried in wastage_pct = 250
+    { stage_code: "bought_out", unit: "piece", rate: 200, qty: 1, wastage_pct: 25 },
+  ];
+
+  const totals = calculateCostSheetTotals(lines, 100);
+
+  assert.equal(totals.material_total, 100);
+  assert.equal(totals.other_total, 350); // 100 misc + 250 bought out
+  assert.equal(totals.total_cost, 450);
+  assert.equal(totals.calculated_sp, 900);
+});

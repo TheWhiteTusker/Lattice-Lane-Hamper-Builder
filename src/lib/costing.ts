@@ -234,6 +234,7 @@ export type CostSheetTotals = {
   hardware_total: number;
   finishing_total: number;
   machine_total: number;
+  other_total: number;
   total_cost: number;
   markup_pct: number;
   calculated_sp: number;
@@ -251,6 +252,7 @@ export function calculateCostSheetTotals(
   let hardware_total = 0;
   let finishing_total = 0;
   let machine_total = 0;
+  let other_total = 0;
 
   for (const line of lines) {
     const { line_total } = calculateLineCost(line);
@@ -264,6 +266,9 @@ export function calculateCostSheetTotals(
       finishing_total += line_total;
     } else if (stage === "machine") {
       machine_total += line_total;
+    } else {
+      // miscellaneous, bought_out, or any stage added later
+      other_total += line_total;
     }
   }
 
@@ -271,9 +276,10 @@ export function calculateCostSheetTotals(
   hardware_total = round2(hardware_total);
   finishing_total = round2(finishing_total);
   machine_total = round2(machine_total);
+  other_total = round2(other_total);
 
   const total_cost = round2(
-    material_total + hardware_total + finishing_total + machine_total,
+    material_total + hardware_total + finishing_total + machine_total + other_total,
   );
 
   const mPct = num(markupPct);
@@ -285,6 +291,7 @@ export function calculateCostSheetTotals(
     hardware_total,
     finishing_total,
     machine_total,
+    other_total,
     total_cost,
     markup_pct: mPct,
     calculated_sp,
