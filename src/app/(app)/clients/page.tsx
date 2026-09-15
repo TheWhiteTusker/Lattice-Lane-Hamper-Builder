@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { requireUser, canManage } from "@/lib/supabase/server";
 import { PageHeader } from "@/components/ui";
+import { LoadMore } from "@/components/load-more";
+import { pageLimit } from "@/lib/paging";
 import { ClientForm } from "./client-form";
 import type { Client } from "@/lib/types";
 
@@ -11,21 +13,29 @@ export default async function ClientsPage({ searchParams }: { searchParams: Sear
   const params = await searchParams;
   const q = one(params.q).trim();
   const editId = one(params.edit);
+  const limit = pageLimit(one(params.limit));
 
   const { supabase, profile } = await requireUser();
 
-  let query = supabase.from("clients").select("*").order("name");
+  let query = supabase.from("clients").select("*", { count: "exact" }).order("name");
   if (q) query = query.or(`name.ilike.%${q}%,gstin.ilike.%${q}%`);
 
-  const { data } = await query.returns<Client[]>();
+  const { data, count } = await query.range(0, limit - 1).returns<Client[]>();
   const rows = data ?? [];
-  const editing = editId ? rows.find((c) => c.id === editId) : undefined;
+  const total = count ?? rows.length;
+
+  // The client being edited may sit beyond the rows loaded so far.
+  const editing = editId
+    ? (rows.find((c) => c.id === editId) ??
+      (await supabase.from("clients").select("*").eq("id", editId).maybeSingle<Client>()).data ??
+      undefined)
+    : undefined;
 
   return (
     <>
       <PageHeader
         title="Clients"
-        subtitle={`${rows.length} client${rows.length === 1 ? "" : "s"} · picked on quotations and proforma invoices`}
+        subtitle={`${total} client${total === 1 ? "" : "s"} ·picked on quotations and proforma invoices`}
       />
 
       <div className="grid items-start gap-4 lg:grid-cols-[400px_1fr]">
@@ -98,6 +108,8 @@ export default async function ClientsPage({ searchParams }: { searchParams: Sear
               </table>
             </div>
           )}
+
+          <LoadMore shown={rows.length} total={total} />
         </div>
       </div>
     </>

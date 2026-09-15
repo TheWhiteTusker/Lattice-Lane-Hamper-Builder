@@ -3,6 +3,8 @@ import Image from "next/image";
 import { requireUser, isAdmin } from "@/lib/supabase/server";
 import { PageHeader, EmptyState } from "@/components/ui";
 import { formatMoney, formatPct } from "@/lib/pricing";
+import { LoadMore } from "@/components/load-more";
+import { pageLimit } from "@/lib/paging";
 import type { Category, ProductWithCategory } from "@/lib/types";
 
 type Search = Promise<Record<string, string | string[] | undefined>>;
@@ -14,31 +16,33 @@ export default async function ProductsPage({ searchParams }: { searchParams: Sea
   const q = one(params.q).trim();
   const category = one(params.category);
   const showInactive = one(params.inactive) === "1";
+  const limit = pageLimit(one(params.limit));
 
   const { supabase, profile } = await requireUser();
   const admin = isAdmin(profile.role);
 
   let query = supabase
     .from("products")
-    .select("*, categories(name, counts_as_item)")
+    .select("*, categories(name, counts_as_item)", { count: "exact" })
     .order("code");
 
   if (q) query = query.or(`name.ilike.%${q}%,code.ilike.%${q}%,source.ilike.%${q}%`);
   if (category) query = query.eq("category_id", category);
   if (!showInactive) query = query.eq("is_active", true);
 
-  const [{ data: products }, { data: categories }] = await Promise.all([
-    query.returns<ProductWithCategory[]>(),
+  const [{ data: products, count }, { data: categories }] = await Promise.all([
+    query.range(0, limit - 1).returns<ProductWithCategory[]>(),
     supabase.from("categories").select("*").order("sort_order").order("name").returns<Category[]>(),
   ]);
 
   const rows = products ?? [];
+  const total = count ?? rows.length;
 
   return (
     <>
       <PageHeader
         title="Product Master"
-        subtitle={`${rows.length} product${rows.length === 1 ? "" : "s"}${showInactive ? " including inactive" : ""}`}
+        subtitle={`${total} product${total === 1 ? "" : "s"}${showInactive ? " including inactive" : ""}`}
       >
         <Link href="/cost-calculator" className="btn-secondary">
           Cost Calculator
@@ -201,6 +205,8 @@ export default async function ProductsPage({ searchParams }: { searchParams: Sea
           </table>
         </div>
       )}
+
+      <LoadMore shown={rows.length} total={total} />
     </>
   );
 }

@@ -2,6 +2,8 @@ import Link from "next/link";
 import { requireUser } from "@/lib/supabase/server";
 import { loadSettings } from "@/lib/settings";
 import { PageHeader, EmptyState } from "@/components/ui";
+import { LoadMore } from "@/components/load-more";
+import { pageLimit } from "@/lib/paging";
 import { formatMoney } from "@/lib/pricing";
 import type { QuoteSummary } from "@/lib/types";
 
@@ -15,26 +17,31 @@ export default async function QuotesPage({ searchParams }: { searchParams: Searc
   const q = one(params.q).trim();
   const status = one(params.status);
   const type = one(params.type);
+  const limit = pageLimit(one(params.limit));
 
   const { supabase } = await requireUser();
 
-  let query = supabase.from("quote_summary").select("*").order("doc_no", { ascending: false });
+  let query = supabase
+    .from("quote_summary")
+    .select("*", { count: "exact" })
+    .order("doc_no", { ascending: false });
   if (q) query = query.or(`client_name.ilike.%${q}%,doc_no.ilike.%${q}%,occasion.ilike.%${q}%`);
   if (status) query = query.eq("status", status);
   if (type) query = query.eq("doc_type", type);
 
-  const [{ data: quotes }, settings] = await Promise.all([
-    query.returns<QuoteSummary[]>(),
+  const [{ data: quotes, count }, settings] = await Promise.all([
+    query.range(0, limit - 1).returns<QuoteSummary[]>(),
     loadSettings(supabase),
   ]);
 
   const rows = quotes ?? [];
+  const total = count ?? rows.length;
 
   return (
     <>
       <PageHeader
         title="Quotation Register"
-        subtitle={`${rows.length} document${rows.length === 1 ? "" : "s"}`}
+        subtitle={`${total} document${total === 1 ? "" : "s"}`}
       >
         <Link href="/quotes/new" className="btn-primary">
           New quotation
@@ -154,6 +161,8 @@ export default async function QuotesPage({ searchParams }: { searchParams: Searc
           </table>
         </div>
       )}
+
+      <LoadMore shown={rows.length} total={total} />
     </>
   );
 }

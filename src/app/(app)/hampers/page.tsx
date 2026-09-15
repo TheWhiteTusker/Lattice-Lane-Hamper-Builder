@@ -2,6 +2,8 @@ import Link from "next/link";
 import { requireUser, canManage } from "@/lib/supabase/server";
 import { loadSettings } from "@/lib/settings";
 import { PageHeader } from "@/components/ui";
+import { LoadMore } from "@/components/load-more";
+import { pageLimit } from "@/lib/paging";
 import { formatMoney, formatPct } from "@/lib/pricing";
 import type { HamperSummary } from "@/lib/types";
 
@@ -17,11 +19,12 @@ export default async function HampersPage({ searchParams }: { searchParams: Sear
   const maxCost = one(params.cost_max).trim();
   const minPrice = one(params.price_min).trim();
   const maxPrice = one(params.price_max).trim();
+  const limit = pageLimit(one(params.limit));
 
   const { supabase, profile } = await requireUser();
   const manage = canManage(profile.role);
 
-  let query = supabase.from("hamper_summary").select("*").order("code");
+  let query = supabase.from("hamper_summary").select("*", { count: "exact" }).order("code");
   if (q) query = query.or(`name.ilike.%${q}%,code.ilike.%${q}%`);
   if (collection) query = query.eq("collection", collection);
   // Items is a floor; cost and catalogue price are ranges, either end optional.
@@ -31,12 +34,13 @@ export default async function HampersPage({ searchParams }: { searchParams: Sear
   if (minPrice) query = query.gte("final_catalogue_sp", Number(minPrice));
   if (maxPrice) query = query.lte("final_catalogue_sp", Number(maxPrice));
 
-  const [{ data: hampers }, settings] = await Promise.all([
-    query.returns<HamperSummary[]>(),
+  const [{ data: hampers, count }, settings] = await Promise.all([
+    query.range(0, limit - 1).returns<HamperSummary[]>(),
     loadSettings(supabase),
   ]);
 
   const rows = hampers ?? [];
+  const total = count ?? rows.length;
   const filtered = !!(
     q ||
     collection ||
@@ -49,7 +53,7 @@ export default async function HampersPage({ searchParams }: { searchParams: Sear
 
   return (
     <>
-      <PageHeader title="Hampers" subtitle={`${rows.length} hamper${rows.length === 1 ? "" : "s"}`}>
+      <PageHeader title="Hampers" subtitle={`${total} hamper${total === 1 ? "" : "s"}`}>
         {profile.role === "admin" && (
           <Link href="/admin/refresh-prices" className="btn-secondary">
             Refresh prices
@@ -190,6 +194,8 @@ export default async function HampersPage({ searchParams }: { searchParams: Sear
           </tbody>
         </table>
       </form>
+
+      <LoadMore shown={rows.length} total={total} />
     </>
   );
 }
