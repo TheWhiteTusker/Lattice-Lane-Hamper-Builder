@@ -3,7 +3,19 @@ import type { Settings } from "@/lib/types";
 
 /** Used when a key is missing from app_settings - matches 0003_seed.sql. */
 export const SETTINGS_DEFAULTS: Settings = {
-  company: { name: "Lattice Lane", address: "", gstin: "", phone: "", email: "", website: "" },
+  company: {
+    name: "Lattice Lane",
+    legal_name: "",
+    address: "",
+    gstin: "",
+    phone: "",
+    email: "",
+    website: "",
+    bank_account_name: "",
+    bank_name: "",
+    bank_account_no: "",
+    bank_ifsc: "",
+  },
   gst_rate: 0.18,
   doc_prefixes: { hamper: "H", quotation: "LLQT-", proforma_invoice: "LLPI-" },
   hamper_statuses: ["Draft", "Approved", "Active", "Discontinued"],
@@ -11,7 +23,7 @@ export const SETTINGS_DEFAULTS: Settings = {
   quote_structures: ["Combined Order", "Option Based"],
   validity_options: ["7 Days", "15 Days", "30 Days"],
   collections: [],
-  sources: [],
+  sources: ["In-house", "Outsourced", "Hybrid"],
   detail_modes: ["Show Contents", "Summary Only", "Hide Contents"],
   default_detail_mode: "Show Contents",
   packaging_treatments: [
@@ -22,6 +34,7 @@ export const SETTINGS_DEFAULTS: Settings = {
   default_packaging_treatment: "Absorb into Box & Packaging",
   default_validity: "15 Days",
   quote_terms: "",
+  pi_terms: "",
   product_colors: ["Walnut", "Natural", "Black"],
 };
 
@@ -33,7 +46,13 @@ export async function loadSettings(supabase: SupabaseClient): Promise<Settings> 
     (data ?? []).map((row: { key: string; value: unknown }) => [row.key, row.value]),
   );
 
-  return { ...SETTINGS_DEFAULTS, ...stored } as Settings;
+  // company is merged a level deeper, so a stored company saved before a field
+  // existed still gets that field's default.
+  return {
+    ...SETTINGS_DEFAULTS,
+    ...stored,
+    company: { ...SETTINGS_DEFAULTS.company, ...(stored.company as object) },
+  } as Settings;
 }
 
 /**

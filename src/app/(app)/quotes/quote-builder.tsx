@@ -5,7 +5,7 @@ import Link from "next/link";
 import { saveQuote, deleteQuote, convertToProforma } from "./actions";
 import { priceQuote, priceQuoteLine, formatMoney, num, round2, COMBINED_ORDER } from "@/lib/pricing";
 import { HamperContents, type ContentItem } from "@/components/hamper-contents";
-import type { Quote, QuoteItem, Settings } from "@/lib/types";
+import type { Client, Quote, QuoteItem, Settings } from "@/lib/types";
 
 export type HamperOption = {
   id: string;
@@ -13,6 +13,13 @@ export type HamperOption = {
   name: string;
   final_catalogue_sp: number | null;
   items: ContentItem[];
+};
+
+export type ProductOption = {
+  id: string;
+  code: string;
+  name: string;
+  default_sp: number;
 };
 
 type Line = {
@@ -47,6 +54,8 @@ export function QuoteBuilder({
   quote,
   items,
   hampers,
+  products,
+  clients,
   packagingCategories,
   settings,
   canEdit,
@@ -56,6 +65,8 @@ export function QuoteBuilder({
   quote?: Quote;
   items?: QuoteItem[];
   hampers: HamperOption[];
+  products: ProductOption[];
+  clients: Client[];
   packagingCategories: string[];
   settings: Settings;
   canEdit: boolean;
@@ -127,6 +138,36 @@ export function QuoteBuilder({
     setLines((prev) => prev.map((l) => (l.key === key ? { ...l, ...patch } : l)));
   }
 
+  function addProduct(productId: string) {
+    const product = products.find((p) => p.id === productId);
+    if (!product) return;
+    setLines((prev) => [...prev, lineFromProduct(product, prev.length + 1)]);
+  }
+
+  // Copies the client's details onto the document, so a sent quote keeps the
+  // address it went out with even if the client record changes later.
+  function pickClient(clientId: string) {
+    const client = clients.find((c) => c.id === clientId);
+    if (!client) return;
+    setClientName(client.name);
+    setContactPerson(client.contact_person ?? "");
+    setPhone(client.phone ?? "");
+    setEmail(client.email ?? "");
+    setBillingAddress(client.billing_address ?? "");
+    setGstin(client.gstin ?? "");
+  }
+
+  // Quotations and proforma invoices have different default terms; swap them
+  // only while the terms are still the untouched default.
+  function changeDocType(next: Quote["doc_type"]) {
+    const defaults = {
+      quotation: settings.quote_terms,
+      proforma_invoice: settings.pi_terms || settings.quote_terms,
+    };
+    if (terms === defaults[docType]) setTerms(defaults[next]);
+    setDocType(next);
+  }
+
   const alreadyAdded = useMemo(
     () => new Set(lines.map((l) => l.hamper_code)),
     [lines],
@@ -179,13 +220,39 @@ export function QuoteBuilder({
 
         {/* ---------------- document + client ---------------- */}
         <section className="card p-4">
+          {canEdit && (
+            <div className="mb-4 flex flex-wrap items-end gap-2 border-b border-[var(--color-line)] pb-4">
+              <Field label="Saved client" htmlFor="savedClient" className="min-w-[280px]">
+                <select
+                  id="savedClient"
+                  className="select mt-1"
+                  value=""
+                  onChange={(e) => pickClient(e.target.value)}
+                >
+                  <option value="">
+                    {clients.length ? "Fill details from a saved client…" : "No saved clients yet"}
+                  </option>
+                  {clients.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.name}
+                      {c.gstin ? ` — ${c.gstin}` : ""}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+              <Link href="/clients" className="btn-secondary">
+                Manage clients
+              </Link>
+            </div>
+          )}
+
           <div className="grid gap-4 md:grid-cols-3">
             <Field label="Document type" htmlFor="docType">
               <select
                 id="docType"
                 className="select mt-1"
                 value={docType}
-                onChange={(e) => setDocType(e.target.value as Quote["doc_type"])}
+                onChange={(e) => changeDocType(e.target.value as Quote["doc_type"])}
                 disabled={!canEdit}
               >
                 <option value="quotation">Quotation</option>
@@ -333,7 +400,7 @@ export function QuoteBuilder({
         <section className="card overflow-hidden">
           <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--color-line)] px-4 py-2.5">
             <div>
-              <h2 className="text-sm font-semibold">Hampers</h2>
+              <h2 className="text-sm font-semibold">Hampers & products</h2>
               <p className="text-xs text-[var(--color-muted)]">
                 {isCombined
                   ? "Combined order — every line is part of one total."
@@ -382,12 +449,34 @@ export function QuoteBuilder({
                   </select>
                 </div>
               )}
+
+              {canEdit && (
+                <div>
+                  <label className="label" htmlFor="productPicker">
+                    Add product
+                  </label>
+                  <select
+                    id="productPicker"
+                    className="select mt-1 min-w-[240px]"
+                    value=""
+                    onChange={(e) => addProduct(e.target.value)}
+                  >
+                    <option value="">Select a product…</option>
+                    {products.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.code} — {p.name}
+                        {alreadyAdded.has(p.code) ? " (already added)" : ""}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
             </div>
           </div>
 
           {lines.length === 0 ? (
             <p className="px-4 py-8 text-center text-sm text-[var(--color-muted)]">
-              No hampers yet. Add one above to start the quotation.
+              Nothing added yet. Add a hamper or a single product above to start.
             </p>
           ) : (
             <div className="overflow-x-auto">
@@ -395,7 +484,7 @@ export function QuoteBuilder({
                 <thead>
                   <tr>
                     <th className="w-[110px]">Option</th>
-                    <th className="w-[240px]">Hamper</th>
+                    <th className="w-[240px]">Item</th>
                     <th className="w-[80px] num">Qty</th>
                     <th className="w-[120px] num">Catalogue price</th>
                     <th className="w-[90px] num">Discount %</th>
@@ -474,6 +563,9 @@ export function QuoteBuilder({
                         </td>
                         <td className="num text-[var(--color-muted)]">{formatMoney(finalRate)}</td>
                         <td className="num font-medium">{formatMoney(amount)}</td>
+                        {/* Product lines have no hamper, so no contents or packaging to set. */}
+                        {line.hamper_id ? (
+                        <>
                         <td>
                           <select
                             aria-label="Contents shown"
@@ -515,6 +607,12 @@ export function QuoteBuilder({
                             ))}
                           </select>
                         </td>
+                        </>
+                        ) : (
+                          <td colSpan={2} className="text-xs text-[var(--color-muted)]">
+                            Single product
+                          </td>
+                        )}
                         {canEdit && (
                           <td className="num">
                             <button
@@ -700,6 +798,25 @@ function lineFromHamper(hamper: HamperOption, index: number, settings: Settings)
     discount_pct: "0",
     detail_mode: settings.default_detail_mode,
     packaging_treatment: settings.default_packaging_treatment,
+  };
+}
+
+/**
+ * A product quoted on its own. It rides in the same hamper_code/hamper_name
+ * columns with no hamper_id, so saving, converting and printing need no changes.
+ */
+function lineFromProduct(product: ProductOption, index: number): Line {
+  return {
+    key: crypto.randomUUID(),
+    option_label: `Option ${index}`,
+    hamper_id: null,
+    hamper_code: product.code,
+    hamper_name: product.name,
+    qty: "1",
+    catalogue_price: String(product.default_sp ?? 0),
+    discount_pct: "0",
+    detail_mode: "",
+    packaging_treatment: "",
   };
 }
 

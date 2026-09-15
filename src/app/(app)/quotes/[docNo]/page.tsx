@@ -65,6 +65,8 @@ export default async function QuotePage({
         quote={quote}
         items={items ?? []}
         hampers={options.hampers}
+        products={options.products}
+        clients={options.clients}
         packagingCategories={options.packagingCategories}
         settings={options.settings}
         canEdit={canEdit}

@@ -10,6 +10,7 @@ import {
   STANDARD_PRODUCT_COLORS,
   COLOR_TO_CODE,
   deriveCategoryCode,
+  codesForColors,
 } from "@/lib/product-code";
 import { ProductImagesManager } from "@/components/product-images-manager";
 import type { Category, Product, ProductImage } from "@/lib/types";
@@ -43,6 +44,7 @@ export function ProductForm({
     product ? String(round2(product.target_margin * 100)) : "",
   );
   const [sellingPrice, setSellingPrice] = useState(String(product?.default_sp ?? ""));
+  const [source, setSource] = useState(product?.source ?? "");
   const [selectedColors, setSelectedColors] = useState<string[]>(
     product?.colors && product.colors.length > 0 ? product.colors : ["Walnut"],
   );
@@ -216,15 +218,26 @@ export function ProductForm({
             <input
               id="source"
               name="source"
-              list="sources"
-              defaultValue={product?.source ?? ""}
+              value={source}
+              onChange={(e) => setSource(e.target.value)}
               className="input mt-1"
             />
-            <datalist id="sources">
+            <div className="mt-1.5 flex flex-wrap gap-1.5">
               {sources.map((s) => (
-                <option key={s} value={s} />
+                <button
+                  key={s}
+                  type="button"
+                  onClick={() => setSource(s)}
+                  className={`rounded-full px-2.5 py-0.5 text-xs font-medium transition-all ${
+                    source === s
+                      ? "bg-[var(--color-brand)] text-white shadow-sm"
+                      : "bg-[var(--color-sheet)] text-[var(--color-muted)] hover:bg-slate-200"
+                  }`}
+                >
+                  {s}
+                </button>
               ))}
-            </datalist>
+            </div>
           </div>
 
           {/* Color Selection */}
@@ -261,6 +274,16 @@ export function ProductForm({
                 );
               })}
             </div>
+            {!product && selectedColors.length > 1 && (
+              <p className="mt-1.5 text-xs text-[var(--color-muted)]">
+                Creates {selectedColors.length} products:{" "}
+                <span className="font-mono">
+                  {codesForColors(code, selectedColors)
+                    .map((c) => c.code)
+                    .join(", ")}
+                </span>
+              </p>
+            )}
           </div>
 
           {/* Cost Price */}
@@ -360,7 +383,13 @@ export function ProductForm({
 
         <div className="mt-5 flex items-center gap-2">
           <button type="submit" className="btn-primary" disabled={pending}>
-            {pending ? "Saving…" : product ? "Save changes" : "Create product"}
+            {pending
+              ? "Saving…"
+              : product
+                ? "Save changes"
+                : selectedColors.length > 1
+                  ? `Create ${selectedColors.length} products`
+                  : "Create product"}
           </button>
           <Link href="/products" className="btn-secondary">
             Cancel

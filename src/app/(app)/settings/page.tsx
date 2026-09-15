@@ -37,7 +37,18 @@ export default async function SettingsPage() {
 
       <div className="grid gap-4 lg:grid-cols-2">
         <CompanyForm company={settings.company} gstRate={settings.gst_rate} />
-        <TermsForm terms={settings.quote_terms} />
+        <div className="grid gap-4">
+          <TermsForm
+            settingKey="quote_terms"
+            title="Default quotation terms"
+            terms={settings.quote_terms}
+          />
+          <TermsForm
+            settingKey="pi_terms"
+            title="Default proforma invoice terms"
+            terms={settings.pi_terms}
+          />
+        </div>
       </div>
 
       {/* ---------------- categories ---------------- */}

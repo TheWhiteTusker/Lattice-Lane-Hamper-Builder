@@ -29,9 +29,47 @@ h3,
   font-family: var(--font-display);
 }
 
+html {
+  scroll-behavior: smooth;
+}
+
 body {
   background: var(--color-paper);
   color: var(--color-ink);
+}
+
+/* Back-to-top: anchor link, not a JS scroll handler. Sizing and shadow follow
+   the Framer BackToTop component; the blue is swapped for the brand sage. It
+   appears after a fixed 200px, not a % of the page, so long lists like the
+   Product Master show it early. Browsers without scroll-driven animations show it
+   all the time, which is a fine fallback. */
+.scroll-top {
+  @apply fixed bottom-6 right-6 z-50 inline-flex h-14 w-14 items-center justify-center
+         rounded-full border border-black/5 bg-[var(--color-brand)] text-white
+         hover:bg-[var(--color-brand-dark)];
+  box-shadow: 0 10px 30px rgb(2 6 23 / 0.12);
+  transition:
+    background 0.18s ease,
+    transform 0.18s ease,
+    opacity 0.18s ease;
+  animation: scroll-top-in both;
+  animation-timeline: scroll(root);
+  animation-range: 200px 300px;
+}
+
+.scroll-top:hover {
+  transform: scale(1.05);
+}
+
+@keyframes scroll-top-in {
+  from {
+    opacity: 0;
+    visibility: hidden;
+  }
+  to {
+    opacity: 1;
+    visibility: visible;
+  }
 }
 
 /* Costing work is dense and numeric: tabular figures everywhere so columns

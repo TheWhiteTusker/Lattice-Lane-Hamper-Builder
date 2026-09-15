@@ -266,11 +266,29 @@ export type QuoteSummary = Quote & {
 
 export type CompanySettings = {
   name: string;
+  /** Registered entity printed on proforma invoices, e.g. "Palm Length LLP". */
+  legal_name: string;
   address: string;
   gstin: string;
   phone: string;
   email: string;
   website: string;
+  bank_account_name: string;
+  bank_name: string;
+  bank_account_no: string;
+  bank_ifsc: string;
+};
+
+export type Client = {
+  id: string;
+  name: string;
+  gstin: string | null;
+  billing_address: string | null;
+  contact_person: string | null;
+  phone: string | null;
+  email: string | null;
+  created_at: string;
+  updated_at: string;
 };
 
 /** Everything in app_settings, resolved into one object. */
@@ -290,5 +308,6 @@ export type Settings = {
   default_packaging_treatment: string;
   default_validity: string;
   quote_terms: string;
+  pi_terms: string;
   product_colors: string[];
 };

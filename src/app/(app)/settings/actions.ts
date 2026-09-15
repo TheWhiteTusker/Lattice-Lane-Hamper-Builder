@@ -23,11 +23,16 @@ async function saveSetting(key: string, value: unknown): Promise<ActionState> {
 
 const CompanySchema = z.object({
   name: z.string().trim().min(1, "Company name is required"),
+  legal_name: z.string().trim(),
   address: z.string().trim(),
   gstin: z.string().trim(),
   phone: z.string().trim(),
   email: z.string().trim(),
   website: z.string().trim(),
+  bank_account_name: z.string().trim(),
+  bank_name: z.string().trim(),
+  bank_account_no: z.string().trim(),
+  bank_ifsc: z.string().trim().toUpperCase(),
 });
 
 export async function saveCompany(
@@ -47,13 +52,6 @@ export async function saveCompany(
   }
 
   return { ok: true };
-}
-
-export async function saveTerms(
-  _prev: ActionState,
-  formData: FormData,
-): Promise<ActionState> {
-  return saveSetting("quote_terms", String(formData.get("quote_terms") ?? ""));
 }
 
 // ---------------------------------------------------------------

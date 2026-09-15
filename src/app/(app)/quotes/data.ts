@@ -1,8 +1,8 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { loadSettings } from "@/lib/settings";
-import type { Category } from "@/lib/types";
+import type { Category, Client } from "@/lib/types";
 import type { ContentItem } from "@/components/hamper-contents";
-import type { HamperOption } from "./quote-builder";
+import type { HamperOption, ProductOption } from "./quote-builder";
 
 type HamperItemRow = ContentItem & { hamper_id: string };
 
@@ -15,7 +15,14 @@ type HamperItemRow = ContentItem & { hamper_id: string };
  * hundred hampers; fetch per selected hamper if it ever gets heavy.
  */
 export async function loadQuoteOptions(supabase: SupabaseClient) {
-  const [{ data: hampers }, { data: items }, { data: categories }, settings] = await Promise.all([
+  const [
+    { data: hampers },
+    { data: items },
+    { data: categories },
+    settings,
+    { data: products },
+    { data: clients },
+  ] = await Promise.all([
     supabase
       .from("hamper_summary")
       .select("id, code, name, final_catalogue_sp")
@@ -28,6 +35,14 @@ export async function loadQuoteOptions(supabase: SupabaseClient) {
       .returns<HamperItemRow[]>(),
     supabase.from("categories").select("*").returns<Category[]>(),
     loadSettings(supabase),
+    // Products can go on a quote on their own, for clients who want just one item.
+    supabase
+      .from("products")
+      .select("id, code, name, default_sp")
+      .eq("is_active", true)
+      .order("code")
+      .returns<ProductOption[]>(),
+    supabase.from("clients").select("*").order("name").returns<Client[]>(),
   ]);
 
   const byHamper = new Map<string, ContentItem[]>();
@@ -39,6 +54,8 @@ export async function loadQuoteOptions(supabase: SupabaseClient) {
 
   return {
     hampers: (hampers ?? []).map((h) => ({ ...h, items: byHamper.get(h.id) ?? [] })),
+    products: products ?? [],
+    clients: clients ?? [],
     // Packaging is whatever Settings marks as not counting toward No. of Items.
     packagingCategories: (categories ?? []).filter((c) => !c.counts_as_item).map((c) => c.name),
     settings,

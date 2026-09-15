@@ -147,6 +147,23 @@ export function getNextSerialForCategory(
 }
 
 /**
+ * One code per selected colour, sharing category and serial:
+ * "LC/0001/WL" + [Walnut, Black] -> LC/0001/WL, LC/0001/BL.
+ */
+export function codesForColors(
+  code: string,
+  colors: string[],
+): { color: string; code: string }[] {
+  const { categoryCode, serial } = parseProductCode(code);
+  return colors.map((color) => ({
+    color,
+    code: categoryCode
+      ? formatProductCode(categoryCode, serial, color)
+      : `${code.trim().toUpperCase()}/${COLOR_TO_CODE[color.toLowerCase()] ?? color.slice(0, 2).toUpperCase()}`,
+  }));
+}
+
+/**
  * Derive 2-letter uppercase category code from category name.
  * e.g. "Lights & Candles" -> "LC", "Box & Packaging" -> "BP", "Decor" -> "DC"
  */

@@ -4,6 +4,7 @@ import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { codesForColors } from "@/lib/product-code";
 import {
   type ActionState,
   optionalText,
@@ -46,14 +47,25 @@ export async function saveProduct(
   const { id, ...values } = parsed.data;
   const supabase = await createClient();
 
+  // A new product in several colours becomes one row per colour, each with its
+  // own code (LC/0001/WL, LC/0001/BL). Editing an existing product stays one row.
+  const rows =
+    id || values.colors.length < 2
+      ? [values]
+      : codesForColors(values.code, values.colors).map(({ color, code }) => ({
+          ...values,
+          code,
+          colors: [color],
+        }));
+
   const { error } = id
     ? await supabase.from("products").update(values).eq("id", id)
-    : await supabase.from("products").insert(values);
+    : await supabase.from("products").insert(rows);
 
   if (error) return { error: describeError(error) };
 
   revalidatePath("/products");
-  redirect(`/products?saved=${encodeURIComponent(values.code)}`);
+  redirect(`/products?saved=${encodeURIComponent(rows.map((r) => r.code).join(", "))}`);
 }
 
 export async function deleteProduct(

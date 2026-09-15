@@ -3,7 +3,6 @@
 import { useActionState } from "react";
 import {
   saveCompany,
-  saveTerms,
   saveList,
   saveDefault,
   saveCategory,
@@ -43,11 +42,24 @@ export function CompanyForm({
       </p>
 
       <div className="mt-4 grid gap-3 sm:grid-cols-2">
-        <div className="sm:col-span-2">
+        <div>
           <label className="label" htmlFor="company-name">
             Company name
           </label>
           <input id="company-name" name="name" defaultValue={company.name} className="input mt-1" required />
+        </div>
+
+        <div>
+          <label className="label" htmlFor="company-legal-name">
+            Legal name (on invoices)
+          </label>
+          <input
+            id="company-legal-name"
+            name="legal_name"
+            defaultValue={company.legal_name}
+            placeholder="e.g. Palm Length LLP"
+            className="input mt-1"
+          />
         </div>
 
         <div className="sm:col-span-2">
@@ -103,6 +115,54 @@ export function CompanyForm({
             className="input input-num mt-1"
           />
         </div>
+
+        <div className="sm:col-span-2 border-t border-[var(--color-line)] pt-3">
+          <h3 className="text-xs font-semibold">Bank details</h3>
+          <p className="mt-0.5 text-xs text-[var(--color-muted)]">Printed on proforma invoices.</p>
+        </div>
+
+        <div>
+          <label className="label" htmlFor="bank-account-name">
+            Account name
+          </label>
+          <input
+            id="bank-account-name"
+            name="bank_account_name"
+            defaultValue={company.bank_account_name}
+            className="input mt-1"
+          />
+        </div>
+
+        <div>
+          <label className="label" htmlFor="bank-name">
+            Bank
+          </label>
+          <input id="bank-name" name="bank_name" defaultValue={company.bank_name} className="input mt-1" />
+        </div>
+
+        <div>
+          <label className="label" htmlFor="bank-account-no">
+            Account number
+          </label>
+          <input
+            id="bank-account-no"
+            name="bank_account_no"
+            defaultValue={company.bank_account_no}
+            className="input mt-1 font-mono"
+          />
+        </div>
+
+        <div>
+          <label className="label" htmlFor="bank-ifsc">
+            IFSC code
+          </label>
+          <input
+            id="bank-ifsc"
+            name="bank_ifsc"
+            defaultValue={company.bank_ifsc}
+            className="input mt-1 font-mono uppercase"
+          />
+        </div>
       </div>
 
       <div className="mt-4 flex items-center gap-3">
@@ -115,22 +175,31 @@ export function CompanyForm({
   );
 }
 
-export function TermsForm({ terms }: { terms: string }) {
-  const [state, action, pending] = useActionState(saveTerms, {});
+export function TermsForm({
+  settingKey,
+  title,
+  terms,
+}: {
+  settingKey: string;
+  title: string;
+  terms: string;
+}) {
+  const [state, action, pending] = useActionState(saveDefault, {});
 
   return (
     <form action={action} className="card p-4">
-      <h2 className="text-sm font-semibold">Default quotation terms</h2>
+      <input type="hidden" name="key" value={settingKey} />
+      <h2 className="text-sm font-semibold">{title}</h2>
       <p className="mt-0.5 text-xs text-[var(--color-muted)]">
-        Copied into each new quotation, where it can still be edited.
+        Copied into each new document, where it can still be edited.
       </p>
 
       <textarea
-        name="quote_terms"
+        name="value"
         rows={6}
         defaultValue={terms}
         className="input mt-3"
-        aria-label="Default quotation terms"
+        aria-label={title}
       />
 
       <div className="mt-3 flex items-center gap-3">

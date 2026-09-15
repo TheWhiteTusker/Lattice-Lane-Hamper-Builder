@@ -1,0 +1,105 @@
+import Link from "next/link";
+import { requireUser, canManage } from "@/lib/supabase/server";
+import { PageHeader } from "@/components/ui";
+import { ClientForm } from "./client-form";
+import type { Client } from "@/lib/types";
+
+type Search = Promise<Record<string, string | string[] | undefined>>;
+const one = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v) ?? "";
+
+export default async function ClientsPage({ searchParams }: { searchParams: Search }) {
+  const params = await searchParams;
+  const q = one(params.q).trim();
+  const editId = one(params.edit);
+
+  const { supabase, profile } = await requireUser();
+
+  let query = supabase.from("clients").select("*").order("name");
+  if (q) query = query.or(`name.ilike.%${q}%,gstin.ilike.%${q}%`);
+
+  const { data } = await query.returns<Client[]>();
+  const rows = data ?? [];
+  const editing = editId ? rows.find((c) => c.id === editId) : undefined;
+
+  return (
+    <>
+      <PageHeader
+        title="Clients"
+        subtitle={`${rows.length} client${rows.length === 1 ? "" : "s"} · picked on quotations and proforma invoices`}
+      />
+
+      <div className="grid items-start gap-4 lg:grid-cols-[400px_1fr]">
+        <ClientForm
+          key={editing?.id ?? "new"}
+          client={editing}
+          canDelete={canManage(profile.role)}
+        />
+
+        <div>
+          <form className="card mb-4 flex items-end gap-3 p-3">
+            <div className="flex-1">
+              <label className="label" htmlFor="q">
+                Search
+              </label>
+              <input
+                id="q"
+                name="q"
+                defaultValue={q}
+                placeholder="Company name or GSTIN"
+                className="input mt-1"
+              />
+            </div>
+            <button type="submit" className="btn-secondary">
+              Apply
+            </button>
+          </form>
+
+          {rows.length === 0 ? (
+            <p className="card px-4 py-8 text-center text-sm text-[var(--color-muted)]">
+              {q ? "No clients match that search." : "No clients yet. Add one on the left."}
+            </p>
+          ) : (
+            <div className="card overflow-x-auto">
+              <table className="table">
+                <thead>
+                  <tr>
+                    <th>Company</th>
+                    <th>GSTIN</th>
+                    <th>Contact</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {rows.map((c) => (
+                    <tr key={c.id} className="align-top">
+                      <td>
+                        <div className="font-medium">{c.name}</div>
+                        {c.billing_address && (
+                          <div className="whitespace-pre-line text-xs text-[var(--color-muted)]">
+                            {c.billing_address}
+                          </div>
+                        )}
+                      </td>
+                      <td className="font-mono whitespace-nowrap">{c.gstin ?? "—"}</td>
+                      <td className="text-[var(--color-muted)]">
+                        {[c.contact_person, c.phone, c.email].filter(Boolean).join(" · ") || "—"}
+                      </td>
+                      <td className="num">
+                        <Link
+                          href={`/clients?edit=${c.id}`}
+                          className="font-medium text-[var(--color-brand)] hover:underline"
+                        >
+                          Edit
+                        </Link>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      </div>
+    </>
+  );
+}

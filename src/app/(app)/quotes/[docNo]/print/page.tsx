@@ -4,6 +4,7 @@ import { requireUser } from "@/lib/supabase/server";
 import { loadSettings } from "@/lib/settings";
 import { formatMoney, formatPct, priceQuote, COMBINED_ORDER } from "@/lib/pricing";
 import { PrintButton } from "./print-button";
+import { ProformaSheet } from "./proforma-sheet";
 import { HamperContents } from "@/components/hamper-contents";
 import type { Category, HamperItem, QuoteItem, QuoteSummary } from "@/lib/types";
 
@@ -79,17 +80,36 @@ export default async function PrintQuotePage({
   const title = quote.doc_type === "proforma_invoice" ? "Proforma Invoice" : "Quotation";
   const company = settings.company;
 
+  const toolbar = (
+    <div className="no-print mb-4 flex flex-wrap items-center gap-2">
+      <Link href={`/quotes/${encodeURIComponent(quote.doc_no)}`} className="btn-secondary">
+        Back to quotation
+      </Link>
+      <PrintButton />
+      <p className="text-sm text-[var(--color-muted)]">
+        Print, then choose “Save as PDF” to send this to a client.
+      </p>
+    </div>
+  );
+
+  if (quote.doc_type === "proforma_invoice") {
+    return (
+      <>
+        {toolbar}
+        <ProformaSheet
+          quote={quote}
+          lines={lines ?? []}
+          byHamper={byHamper}
+          packagingCategories={packagingCategories}
+          company={company}
+        />
+      </>
+    );
+  }
+
   return (
     <>
-      <div className="no-print mb-4 flex flex-wrap items-center gap-2">
-        <Link href={`/quotes/${encodeURIComponent(quote.doc_no)}`} className="btn-secondary">
-          Back to quotation
-        </Link>
-        <PrintButton />
-        <p className="text-sm text-[var(--color-muted)]">
-          Print, then choose “Save as PDF” to send this to a client.
-        </p>
-      </div>
+      {toolbar}
 
       <article className="print-sheet card mx-auto max-w-[820px] p-10 text-[13px] leading-relaxed">
         {/* ---------------- letterhead ---------------- */}
@@ -159,7 +179,7 @@ export default async function PrintQuotePage({
           <thead>
             <tr>
               <th className="w-8">#</th>
-              <th>Hamper</th>
+              <th>Item</th>
               <th className="num w-16">Qty</th>
               <th className="num w-24">Rate</th>
               <th className="num w-24">Amount</th>

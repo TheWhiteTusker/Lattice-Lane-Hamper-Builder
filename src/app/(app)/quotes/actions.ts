@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { type ActionState, describeError } from "@/lib/forms";
+import { loadSettings } from "@/lib/settings";
 
 const nullableText = z.string().trim().nullable().optional();
 const nullableDate = z
@@ -48,7 +49,7 @@ const QuoteSchema = z.object({
   terms: nullableText,
   follow_up_date: nullableDate,
   linked_doc_no: nullableText,
-  lines: z.array(LineSchema).min(1, "Add at least one hamper to the quotation"),
+  lines: z.array(LineSchema).min(1, "Add at least one hamper or product to the quotation"),
 });
 
 export async function saveQuote(
@@ -113,6 +114,8 @@ export async function convertToProforma(
 
   if (readError || !quote) return { error: describeError(readError ?? "Not found") };
 
+  const { pi_terms } = await loadSettings(supabase);
+
   const { quote_items: lines, id: _id, doc_no: _docNo, created_at, updated_at, ...rest } = quote;
   void _id;
   void _docNo;
@@ -125,6 +128,8 @@ export async function convertToProforma(
       doc_type: "proforma_invoice",
       status: "Draft",
       linked_doc_no: docNo,
+      // A PI carries payment terms (advance, delivery), not quotation terms.
+      terms: pi_terms || rest.terms,
       lines: (lines ?? []).map(
         (l: {
           option_label: string | null;
