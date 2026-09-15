@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
@@ -27,29 +28,34 @@ export async function createClient() {
   );
 }
 
-/** Current user + profile, or a redirect to /login. Use in every page. */
-export async function requireUser(): Promise<{
+/**
+ * Current user + profile, or a redirect to /login. Use in every page.
+ *
+ * cache() makes the layout and the page share one lookup per request instead
+ * of each doing their own. getClaims() verifies the JWT locally against the
+ * project's ES256 signing keys, so there is no round-trip to Supabase Auth.
+ */
+export const requireUser = cache(async (): Promise<{
   supabase: Awaited<ReturnType<typeof createClient>>;
   profile: Profile;
-}> {
+}> => {
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const { data } = await supabase.auth.getClaims();
+  const userId = data?.claims.sub;
 
-  if (!user) redirect("/login");
+  if (!userId) redirect("/login");
 
   const { data: profile } = await supabase
     .from("profiles")
     .select("*")
-    .eq("id", user.id)
+    .eq("id", userId)
     .single<Profile>();
 
   // Auth row exists but the profile trigger has not caught up yet.
   if (!profile) redirect("/login?error=no-profile");
 
   return { supabase, profile };
-}
+});
 
 /**
  * Gate a page on role. The database enforces this too (see 0002_rls.sql);

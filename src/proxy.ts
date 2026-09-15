@@ -44,9 +44,10 @@ export async function proxy(request: NextRequest) {
     },
   });
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  // getClaims() still refreshes an expired session (and writes the cookies),
+  // but verifies the JWT locally instead of calling Supabase Auth each request.
+  const { data } = await supabase.auth.getClaims();
+  const user = data?.claims;
 
   const path = request.nextUrl.pathname;
   const isPublic = path.startsWith("/login") || path.startsWith("/auth");
