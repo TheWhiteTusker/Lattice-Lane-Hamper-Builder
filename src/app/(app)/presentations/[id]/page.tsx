@@ -1,4 +1,4 @@
-import { notFound } from "next/navigation";
+import { redirect } from "next/navigation";
 import { requireUser } from "@/lib/supabase/server";
 import { parseCanvas } from "@/lib/hamper-canvas";
 import { loadPickerData } from "../data";
@@ -24,7 +24,7 @@ export default async function PresentationPage({ params }: { params: Promise<{ i
       .returns<{ id: string; kind: string; canvas: unknown }[]>(),
     loadPickerData(supabase),
   ]);
-  if (!deck) notFound();
+  if (!deck) redirect("/presentations"); // deleted, or a stale link
 
   return (
     <DeckOverview

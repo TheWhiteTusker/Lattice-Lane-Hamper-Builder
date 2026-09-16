@@ -1,4 +1,4 @@
-import { notFound } from "next/navigation";
+import { redirect } from "next/navigation";
 import { requireUser } from "@/lib/supabase/server";
 import { parseCanvas } from "@/lib/hamper-canvas";
 import { CanvasEditor } from "@/components/studio/canvas-editor";
@@ -22,7 +22,10 @@ export default async function SlideEditorPage({ params }: { params: Promise<{ id
 
   const all = slides ?? [];
   const index = all.findIndex((s) => s.id === slideId);
-  if (!deck || index < 0) notFound();
+  // A deleted slide (or deck) goes back to where it lived rather than a 404,
+  // e.g. when a refresh lands on the slide that was just removed.
+  if (!deck) redirect("/presentations");
+  if (index < 0) redirect(`/presentations/${id}`);
   const slide = all[index];
 
   // Offer the slide's own hamper contents (or product) first in the Products panel.

@@ -1,4 +1,4 @@
-import { notFound } from "next/navigation";
+import { redirect } from "next/navigation";
 import { requireUser } from "@/lib/supabase/server";
 import { parseCanvas } from "@/lib/hamper-canvas";
 import { PrintDeck } from "./print-deck";
@@ -16,7 +16,7 @@ export default async function PrintPresentationPage({ params }: { params: Promis
       .order("position")
       .returns<{ id: string; canvas: unknown }[]>(),
   ]);
-  if (!deck) notFound();
+  if (!deck) redirect("/presentations"); // deleted, or a stale link
 
   return <PrintDeck deck={deck} slides={(slides ?? []).map((s) => ({ id: s.id, canvas: parseCanvas(s.canvas) }))} />;
 }
