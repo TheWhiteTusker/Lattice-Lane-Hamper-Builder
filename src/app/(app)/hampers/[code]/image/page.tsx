@@ -3,7 +3,8 @@ import { requireRole } from "@/lib/supabase/server";
 import { parseCanvas } from "@/lib/hamper-canvas";
 import type { Hamper } from "@/lib/types";
 import { loadCatalog } from "../../data";
-import { CanvasEditor } from "./canvas-editor";
+import { CanvasEditor } from "@/components/studio/canvas-editor";
+import { saveHamperCanvas, uploadHamperBackground } from "./actions";
 
 export default async function HamperImagePage({
   params,
@@ -32,9 +33,13 @@ export default async function HamperImagePage({
 
   return (
     <CanvasEditor
-      hamperId={hamper.id}
-      hamperName={hamper.name}
-      hamperCode={hamper.code}
+      title={hamper.name}
+      subtitle={hamper.code}
+      backHref={`/hampers/${encodeURIComponent(hamper.code)}`}
+      downloadName={hamper.code}
+      onSave={saveHamperCanvas.bind(null, hamper.id)}
+      onUpload={uploadHamperBackground.bind(null, hamper.id)}
+      savedMessage="Saved. The hamper image is updated."
       initial={parseCanvas(hamper.canvas)}
       hamperProductIds={[...new Set((items ?? []).flatMap((i) => (i.product_id ? [i.product_id] : [])))]}
       products={catalog.products.map((p) => ({

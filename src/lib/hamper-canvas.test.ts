@@ -1,6 +1,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
+  backgroundImageAttrs,
+  layerConfig,
   alignBoxes,
   alignToPage,
   boundsOf,
@@ -58,7 +60,7 @@ test("parseCanvas round-trips a valid document and falls back on junk", () => {
       fill: { type: "linear", from: "#111111", to: "#eeeeee", angle: 45 },
     },
     {
-      id: "i1", visible: true, locked: false, kind: "image", x: 0, y: 0, rotation: 0, scaleX: 2, scaleY: 2, opacity: 0.5,
+      id: "i1", visible: true, locked: false, fit: "stretch", kind: "image", x: 0, y: 0, rotation: 0, scaleX: 2, scaleY: 2, opacity: 0.5,
       product_id: null, url: "https://example.com/a.png", width: 200, height: 100,
     },
   );
@@ -173,4 +175,19 @@ test("multi-selection geometry: bounds, hit test, align and distribute", () => {
   const shuffled = [boxes[2], boxes[0], boxes[1]];
   assert.deepEqual(distributeBoxes(shuffled, "x").map((d) => d.dx), [0, 0, -5]);
   assert.deepEqual(distributeBoxes(boxes.slice(0, 2), "x"), [{ dx: 0, dy: 0 }, { dx: 0, dy: 0 }]);
+});
+
+test("layerConfig: contain fits and centres the photo inside its frame", () => {
+  const base = { id: "i", visible: true, locked: false, x: 10, y: 20, rotation: 0, scaleX: 1, scaleY: 1, opacity: 1, product_id: null, url: "https://e.com/a.png" };
+  const tall = { naturalWidth: 100, naturalHeight: 200 };
+  const c = layerConfig({ ...base, kind: "image", width: 400, height: 400, fit: "contain" }, tall);
+  assert.equal(c.shape, "Image");
+  assert.deepEqual([c.attrs.width, c.attrs.height, c.attrs.offsetX, c.attrs.offsetY], [200, 400, -100, -0]);
+  // Stretch (and contain before the image has loaded) keeps the frame size.
+  const s = layerConfig({ ...base, kind: "image", width: 400, height: 400, fit: "stretch" }, tall);
+  assert.deepEqual([s.attrs.width, s.attrs.height, s.attrs.offsetX], [400, 400, undefined]);
+
+  assert.deepEqual(backgroundImageAttrs({ width: 1000, height: 500 }, { naturalWidth: 100, naturalHeight: 100 }), {
+    width: 1000, height: 1000, x: 0, y: -250,
+  });
 });

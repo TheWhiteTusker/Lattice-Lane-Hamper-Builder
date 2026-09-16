@@ -4,10 +4,9 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { describeError } from "@/lib/forms";
 import { CanvasSchema } from "@/lib/hamper-canvas";
+import type { ActionResult } from "@/components/studio/editor";
 
 const BUCKET = "product-images";
-
-export type CanvasActionResult = { ok?: boolean; error?: string; url?: string };
 
 /** "…/object/public/product-images/hampers/x/y.png?v=1" -> "hampers/x/y.png" */
 const storagePathOf = (url: string | null) =>
@@ -26,10 +25,9 @@ async function upload(folder: string, file: File, name: string) {
   return { supabase, path, url: supabase.storage.from(BUCKET).getPublicUrl(path).data.publicUrl };
 }
 
-/** Saves the layout and the PNG rendered from it, replacing the previous PNG. */
-export async function saveHamperCanvas(formData: FormData): Promise<CanvasActionResult> {
+/** Saves the layout and the PNG rendered from it, replacing the previous PNG. Bind the hamper id. */
+export async function saveHamperCanvas(hamperId: string, formData: FormData): Promise<ActionResult> {
   try {
-    const hamperId = String(formData.get("hamperId") ?? "");
     const png = formData.get("png");
     if (!hamperId) return { error: "Missing hamper." };
     if (!(png instanceof File) || png.size === 0) return { error: "The image could not be rendered." };
@@ -79,9 +77,8 @@ export async function saveHamperCanvas(formData: FormData): Promise<CanvasAction
 }
 
 // ponytail: replaced backgrounds are left in storage; clean up on save if the bucket grows.
-export async function uploadHamperBackground(formData: FormData): Promise<CanvasActionResult> {
+export async function uploadHamperBackground(hamperId: string, formData: FormData): Promise<ActionResult> {
   try {
-    const hamperId = String(formData.get("hamperId") ?? "");
     const file = formData.get("file");
     if (!hamperId) return { error: "Missing hamper." };
     if (!(file instanceof File) || file.size === 0) return { error: "Please choose an image." };

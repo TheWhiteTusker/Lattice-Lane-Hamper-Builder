@@ -420,7 +420,8 @@ export function HamperBuilder({
               className="h-16 w-16 rounded-md border border-[var(--color-line)] object-cover"
             />
           )}
-          <Link href={`/hampers/${encodeURIComponent(hamper.code)}/image`} className="btn-secondary">
+          {/* No prefetch: the image editor (and its canvas library) loads only when opened. */}
+          <Link href={`/hampers/${encodeURIComponent(hamper.code)}/image`} prefetch={false} className="btn-secondary">
             {hamper.image_url ? "Edit image" : "Design image"}
           </Link>
           <Link href={`/quotes/new?hamper=${encodeURIComponent(hamper.code)}`} className="btn-secondary">

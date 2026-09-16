@@ -19,6 +19,7 @@ export function Nav({ profile }: { profile: Profile }) {
   const links = [
     { href: "/", label: "Dashboard" },
     { href: "/hampers", label: "Hampers" },
+    { href: "/presentations", label: "Presentations" },
     { href: "/quotes", label: "Quotes" },
     { href: "/clients", label: "Clients" },
     { href: "/products", label: "Products" },

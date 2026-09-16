@@ -3,19 +3,20 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Check, ChevronDown, Plus, Search } from "lucide-react";
 import { fillCss, type Fill } from "@/lib/hamper-canvas";
+import { FONTS } from "./render";
 
 export const cx = (...c: (string | false | null | undefined)[]) => c.filter(Boolean).join(" ");
 
 export const toolBtn =
   "inline-flex h-8 shrink-0 items-center justify-center gap-1.5 rounded-md px-2 text-[13px] text-[var(--st-text)] " +
   "transition-colors hover:bg-[var(--st-hover)] disabled:pointer-events-none disabled:opacity-35";
-export const toolBtnActive = "bg-[var(--st-accent-soft)] text-white hover:bg-[var(--st-accent-soft)]";
+export const toolBtnActive = "bg-[var(--st-accent-soft)] text-[var(--st-accent-strong)] hover:bg-[var(--st-accent-soft)]";
 export const fieldCls =
   "h-8 rounded-md border border-[var(--st-line)] bg-[var(--st-panel-2)] px-2 text-[13px] text-[var(--st-text)] " +
   "outline-none focus:border-[var(--st-accent)]";
 export const accentBtn =
   "inline-flex h-8 items-center justify-center gap-1.5 rounded-md bg-[var(--st-accent)] px-3 text-[13px] font-medium " +
-  "text-white hover:brightness-110 disabled:opacity-50";
+  "text-[var(--st-on-accent)] hover:bg-[var(--st-accent-strong)] disabled:opacity-50";
 export const panelTitle = "text-[11px] font-semibold uppercase tracking-wider text-[var(--st-muted)]";
 
 export function ToolButton({
@@ -76,8 +77,9 @@ export function Popover({
       </ToolButton>
       {open && (
         <div
+          data-popover
           className={cx(
-            "absolute top-full z-50 mt-1.5 rounded-lg border border-[var(--st-line)] bg-[var(--st-panel)] p-3 shadow-2xl shadow-black/60",
+            "absolute top-full z-50 mt-1.5 rounded-lg border border-[var(--st-line)] bg-[var(--st-panel)] p-3 shadow-xl shadow-[#2c332f]/15",
             align === "right" ? "right-0" : "left-0",
           )}
           style={{ width }}
@@ -189,7 +191,7 @@ export function ScrubNumber({
         disabled={disabled}
         inputMode="decimal"
         aria-label={typeof label === "string" ? label : undefined}
-        className="h-7 w-full min-w-0 rounded border border-transparent bg-transparent px-1 text-[12px] tabular-nums text-[#7cc4ff] outline-none hover:border-[var(--st-line)] focus:border-[var(--st-accent)] focus:bg-[var(--st-panel-2)] focus:text-[var(--st-text)]"
+        className="h-7 w-full min-w-0 rounded border border-transparent bg-transparent px-1 text-[12px] tabular-nums text-[var(--st-value)] outline-none hover:border-[var(--st-line)] focus:border-[var(--st-accent)] focus:bg-[var(--st-panel-2)] focus:text-[var(--st-text)]"
         value={draft ?? String(tidy(value))}
         onFocus={(e) => e.target.select()}
         onChange={(e) => setDraft(e.target.value)}
@@ -219,8 +221,10 @@ const DEFAULT_COLORS = [
   "#ff3131", "#ff5757", "#ff66c4", "#cb6ce6", "#8c52ff", "#5e17eb",
   "#0097b2", "#0cc0df", "#5ce1e6", "#38b6ff", "#5271ff", "#004aad",
   "#00bf63", "#7ed957", "#c1ff72", "#ffde59", "#ffbd59", "#ff914d",
-  "#2c332f", "#54655b", "#ddcf8b", "#faf8ee", "#f1ebe0", "#b08d57",
 ];
+
+/** latticelane.com's palette: deep green, sage, soft gold, cream, sand, bronze. */
+const BRAND_COLORS = ["#2c332f", "#54655b", "#ddcf8b", "#faf8ee", "#f1ebe0", "#b08d57"];
 
 const GRADIENT_PRESETS: Fill[] = [
   { type: "linear", from: "#faf8ee", to: "#ddcf8b", angle: 90 },
@@ -243,7 +247,7 @@ function Swatch({ fill, selected, onClick, title }: { fill: Fill; selected?: boo
       aria-label={title}
       onClick={onClick}
       className={cx(
-        "relative aspect-square w-full rounded-md border border-white/15 transition-transform hover:scale-110",
+        "relative aspect-square w-full rounded-md border border-black/10 transition-transform hover:scale-110",
         selected && "ring-2 ring-[var(--st-accent)] ring-offset-2 ring-offset-[var(--st-panel)]",
       )}
       style={{ background: fillCss(fill) }}
@@ -258,7 +262,7 @@ function CustomColor({ value, onChange, title }: { value: string; onChange: (c: 
   return (
     <label
       title={title}
-      className="relative flex aspect-square w-full cursor-pointer items-center justify-center rounded-md border border-white/15 hover:scale-110"
+      className="relative flex aspect-square w-full cursor-pointer items-center justify-center rounded-md border border-black/10 hover:scale-110"
       style={{ background: "conic-gradient(red, yellow, lime, cyan, blue, magenta, red)" }}
     >
       <Plus className="h-4 w-4 text-white drop-shadow" />
@@ -290,7 +294,7 @@ export function ColorPanel({
               key={t}
               type="button"
               onClick={() => setTab(t)}
-              className={cx("h-7 rounded text-[12px]", tab === t ? "bg-[var(--st-hover)] text-white" : "text-[var(--st-muted)]")}
+              className={cx("h-7 rounded text-[12px]", tab === t ? "bg-[var(--st-panel)] text-[var(--st-text)] shadow-sm" : "text-[var(--st-muted)]")}
             >
               {t === "solid" ? "Solid colour" : "Gradient"}
             </button>
@@ -317,6 +321,20 @@ export function ColorPanel({
               </div>
             </div>
           )}
+          <div>
+            <div className={cx(panelTitle, "mb-1.5")}>Lattice Lane colours</div>
+            <div className="grid grid-cols-6 gap-1.5">
+              {BRAND_COLORS.map((c) => (
+                <Swatch
+                  key={c}
+                  title={c}
+                  fill={{ type: "solid", color: c }}
+                  selected={fill.type === "solid" && fill.color === c}
+                  onClick={() => onChange({ type: "solid", color: c })}
+                />
+              ))}
+            </div>
+          </div>
           <div>
             <div className={cx(panelTitle, "mb-1.5")}>Default colours</div>
             <div className="grid grid-cols-6 gap-1.5">
@@ -353,12 +371,12 @@ export function ColorPanel({
               fill.type === "linear" ? fill : { type: "linear", from: first, to: "#ffffff", angle: 90 };
             return (
               <>
-                <div className="h-8 rounded-md border border-white/15" style={{ background: fillCss(g) }} />
+                <div className="h-8 rounded-md border border-black/10" style={{ background: fillCss(g) }} />
                 <div className="flex items-center gap-2">
                   {(["from", "to"] as const).map((k) => (
                     <label key={k} className="flex flex-1 items-center gap-2 text-[12px] text-[var(--st-muted)]">
                       <span
-                        className="relative h-7 w-7 shrink-0 cursor-pointer rounded-md border border-white/15"
+                        className="relative h-7 w-7 shrink-0 cursor-pointer rounded-md border border-black/10"
                         style={{ background: g[k] }}
                       >
                         <input
@@ -422,7 +440,7 @@ export function ColorButton({
             <span className="mt-0.5 h-1 w-5 rounded-full" style={{ background: fillCss(fill) }} />
           </span>
         ) : (
-          <span className="h-6 w-6 rounded-md border border-white/25" style={{ background: fillCss(fill) }} />
+          <span className="h-6 w-6 rounded-md border border-black/15" style={{ background: fillCss(fill) }} />
         )
       }
     >
@@ -432,30 +450,6 @@ export function ColorButton({
 }
 
 /* ------------------------------------------------------------------- fonts */
-
-export const FONTS: { family: string; google?: string }[] = [
-  { family: "Playfair Display", google: "Playfair+Display:ital,wght@0,400;0,700;1,400;1,700" },
-  { family: "Cormorant Garamond", google: "Cormorant+Garamond:ital,wght@0,400;0,700;1,400;1,700" },
-  { family: "Lora", google: "Lora:ital,wght@0,400;0,700;1,400;1,700" },
-  { family: "Cinzel", google: "Cinzel:wght@400;700" },
-  { family: "Montserrat", google: "Montserrat:ital,wght@0,400;0,700;1,400;1,700" },
-  { family: "Poppins", google: "Poppins:ital,wght@0,400;0,700;1,400;1,700" },
-  { family: "Inter", google: "Inter:ital,wght@0,400;0,700;1,400;1,700" },
-  { family: "Cabin", google: "Cabin:ital,wght@0,400;0,700;1,400;1,700" },
-  { family: "Oswald", google: "Oswald:wght@400;700" },
-  { family: "Bebas Neue", google: "Bebas+Neue" },
-  { family: "Great Vibes", google: "Great+Vibes" },
-  { family: "Dancing Script", google: "Dancing+Script:wght@400;700" },
-  { family: "Pacifico", google: "Pacifico" },
-  { family: "Arial" },
-  { family: "Georgia" },
-  { family: "Times New Roman" },
-  { family: "Courier New" },
-];
-
-export const FONTS_HREF = `https://fonts.googleapis.com/css2?${FONTS.filter((f) => f.google)
-  .map((f) => `family=${f.google}`)
-  .join("&")}&display=swap`;
 
 export function FontPicker({ value, onChange }: { value: string; onChange: (family: string) => void }) {
   const [q, setQ] = useState("");
@@ -512,5 +506,63 @@ export function FontPicker({ value, onChange }: { value: string; onChange: (fami
         </>
       )}
     </Popover>
+  );
+}
+
+/* -------------------------------------------------------------- page size */
+
+const PAGE_MIN = 100;
+const PAGE_MAX = 8000;
+
+/** Page width × height boxes: type a number, then Enter or click away to apply. */
+export function PageSizeInputs({
+  width,
+  height,
+  onChange,
+}: {
+  width: number;
+  height: number;
+  onChange: (width: number, height: number) => void;
+}) {
+  return (
+    <div className="flex items-center gap-1" title={`Page size in pixels (${PAGE_MIN}–${PAGE_MAX})`}>
+      <SizeBox label="W" name="Page width in pixels" value={width} onCommit={(w) => onChange(w, height)} />
+      <span className="text-[var(--st-muted)]">×</span>
+      <SizeBox label="H" name="Page height in pixels" value={height} onCommit={(h) => onChange(width, h)} />
+      <span className="text-[11px] text-[var(--st-muted)]">px</span>
+    </div>
+  );
+}
+
+function SizeBox({ label, name, value, onCommit }: { label: string; name: string; value: number; onCommit: (v: number) => void }) {
+  const [draft, setDraft] = useState<string | null>(null);
+  const n = Number(draft);
+  const invalid = draft !== null && !(/^\s*\d+\s*$/.test(draft) && n >= PAGE_MIN && n <= PAGE_MAX);
+
+  const commit = () => {
+    if (draft !== null && !invalid && n !== value) onCommit(n);
+    setDraft(null); // an invalid entry snaps back to the current size
+  };
+
+  return (
+    <label className="flex items-center gap-1">
+      <span className="text-[11px] text-[var(--st-muted)]">{label}</span>
+      <input
+        aria-label={name}
+        inputMode="numeric"
+        className={cx(fieldCls, "h-7 w-[64px] px-1.5 text-right tabular-nums", invalid && "border-red-600 focus:border-red-600")}
+        value={draft ?? String(value)}
+        onFocus={(e) => e.target.select()}
+        onChange={(e) => setDraft(e.target.value)}
+        onBlur={commit}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") e.currentTarget.blur();
+          if (e.key === "Escape") {
+            setDraft(null);
+            e.currentTarget.blur();
+          }
+        }}
+      />
+    </label>
   );
 }

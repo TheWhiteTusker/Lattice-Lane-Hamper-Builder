@@ -39,6 +39,7 @@ import {
   ColorButton,
   Divider,
   FontPicker,
+  PageSizeInputs,
   Popover,
   Slider,
   ToolButton,
@@ -63,7 +64,13 @@ function PageTools({ ed }: { ed: Editor }) {
   const bg = ed.canvas.background;
   return (
     <>
-      <span className="mr-1 text-[12px] text-[var(--st-muted)]">Page</span>
+      <span className="mr-1 text-[12px] text-[var(--st-muted)]">Page size</span>
+      <PageSizeInputs
+        width={ed.canvas.width}
+        height={ed.canvas.height}
+        onChange={(width, height) => ed.change((c) => ({ ...c, width, height }))}
+      />
+      <Divider />
       <ColorButton
         title="Background colour"
         fill={bg.fill}
@@ -147,7 +154,7 @@ function MultiTools({ ed }: { ed: Editor }) {
     <>
       <span className="mr-2 rounded-md bg-[var(--st-accent-soft)] px-2 py-1 text-[12px]">{n} elements selected</span>
       <AlignMenu ed={ed} ids={ids} />
-      <button type="button" className="ml-1 text-[12px] text-[var(--st-muted)] underline hover:text-white" onClick={() => ed.select(null)}>
+      <button type="button" className="ml-1 text-[12px] text-[var(--st-muted)] underline hover:text-[var(--st-text)]" onClick={() => ed.select(null)}>
         Clear selection
       </button>
 
@@ -300,7 +307,7 @@ function ShapeTools({ ed, l }: { ed: Editor; l: Extract<Layer, { kind: "rect" | 
           <Slider label="Border weight" value={l.strokeWidth} min={0} max={60} onChange={(strokeWidth) => ed.tweak(l.id, { strokeWidth })} />
           <label className="flex items-center justify-between text-[12px] text-[var(--st-muted)]">
             Border colour
-            <span className="relative h-7 w-10 cursor-pointer rounded-md border border-white/20" style={{ background: l.stroke }}>
+            <span className="relative h-7 w-10 cursor-pointer rounded-md border border-black/15" style={{ background: l.stroke }}>
               <input
                 type="color"
                 value={l.stroke}

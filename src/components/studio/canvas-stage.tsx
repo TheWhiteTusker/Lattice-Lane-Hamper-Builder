@@ -2,6 +2,7 @@
 
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import type Konva from "konva";
 import {
   Ellipse,
@@ -30,6 +31,8 @@ import {
 } from "lucide-react";
 import {
   CANVAS_PRESETS,
+  backgroundImageAttrs,
+  layerConfig,
   alignBoxes,
   alignToPage,
   boundsOf,
@@ -50,26 +53,25 @@ import {
 } from "@/lib/hamper-canvas";
 import { removeBackground } from "@/lib/background-removal";
 import { uploadProductImage } from "@/app/(app)/products/image-actions";
-import { saveHamperCanvas, uploadHamperBackground } from "./actions";
-import { DRAG_MIME, baseLayer, type Editor, type PickerProduct } from "./editor";
+import { DRAG_MIME, baseLayer, type ActionResult, type Editor, type PickerProduct } from "./editor";
+import { ensureFontStylesheet, fontFaces, loadImage } from "./render";
+import { SlideThumb } from "./slide-thumb";
 import { ContextToolbar } from "./context-toolbar";
 import { LayersPanel, TransformPanel } from "./layers-panel";
 import { Rail, SidePanel, type SideTab } from "./side-panels";
-import { FONTS_HREF, Popover, ToolButton, accentBtn, cx, panelTitle, toolBtn } from "./studio-ui";
+import { PageSizeInputs, Popover, ToolButton, accentBtn, cx, fieldCls, panelTitle, toolBtn } from "./studio-ui";
 
-const ACCENT = "#8b5cf6";
+/** Canvas-drawn colours; keep in step with the .studio tokens in globals.css. */
+const STUDIO_COLORS = {
+  accent: "#54655b", // sage
+  guide: "#b8962e", // deep gold, visible on white and cream pages alike
+  locked: "#a8a28f",
+  handleFill: "#faf8ee",
+  pageShadow: "#2c332f",
+};
+const ACCENT = STUDIO_COLORS.accent;
 const ZOOM_MIN = 0.05;
 const ZOOM_MAX = 4;
-
-const loadImage = (url: string) =>
-  new Promise<HTMLImageElement>((resolve, reject) => {
-    const img = new window.Image();
-    // Without this the page becomes "tainted" and the PNG export throws.
-    img.crossOrigin = "anonymous";
-    img.onload = () => resolve(img);
-    img.onerror = () => reject(new Error(`Could not load ${url}`));
-    img.src = url;
-  });
 
 function useImage(url: string | null) {
   const [img, setImg] = useState<{ url: string; el: HTMLImageElement } | null>(null);
@@ -102,20 +104,39 @@ const SHORTCUTS: [string, string][] = [
 ];
 
 export default function CanvasStage({
-  hamperId,
-  hamperName,
-  hamperCode,
+  title,
+  subtitle,
+  backHref,
+  downloadName,
   initial,
   products,
   hamperProductIds,
+  onSave,
+  onUpload,
+  saveImage = true,
+  savedMessage = "Saved.",
+  pages,
+  pageId,
 }: {
-  hamperId: string;
-  hamperName: string;
-  hamperCode: string;
+  title: string;
+  subtitle?: string;
+  backHref: string;
+  downloadName: string;
   initial: HamperCanvas;
   products: PickerProduct[];
+  /** Products offered first in the Products panel ("In this hamper"). */
   hamperProductIds: string[];
+  /** Server action; receives `canvas` (JSON) and, with saveImage, `png`. */
+  onSave: (formData: FormData) => Promise<ActionResult>;
+  /** Server action; receives `file`, returns its public `url`. */
+  onUpload: (formData: FormData) => Promise<ActionResult>;
+  saveImage?: boolean;
+  savedMessage?: string;
+  /** Sibling pages (presentation slides) shown as a strip under the page. */
+  pages?: { id: string; href: string; canvas: HamperCanvas }[];
+  pageId?: string;
 }) {
+  const router = useRouter();
   /* ------------------------------------------------------------- document */
   const [hist, setHist] = useState(() => startHistory(initial));
   const canvas = hist.present;
@@ -137,6 +158,7 @@ export default function CanvasStage({
   const [removing, setRemoving] = useState(false);
   const [fontTick, setFontTick] = useState(0);
   const [clipboard, setClipboard] = useState<Layer[]>([]);
+  const [resizingPage, setResizingPage] = useState(false);
 
   const stageRef = useRef<Konva.Stage>(null);
   const pageRef = useRef<Konva.Group>(null);
@@ -208,20 +230,13 @@ export default function CanvasStage({
 
   /* ---------------------------------------------------------------- fonts */
   useEffect(() => {
-    if (!document.querySelector(`link[data-studio-fonts]`)) {
-      const link = document.createElement("link");
-      link.rel = "stylesheet";
-      link.href = FONTS_HREF;
-      link.dataset.studioFonts = "";
-      document.head.appendChild(link);
-    }
+    ensureFontStylesheet();
     const bump = () => setFontTick((t) => t + 1);
     document.fonts.addEventListener("loadingdone", bump);
     return () => document.fonts.removeEventListener("loadingdone", bump);
   }, []);
 
-  // Canvas text doesn't trigger web-font downloads by itself, so ask for each face in use.
-  const faces = [...new Set(canvas.layers.flatMap((l) => (l.kind === "text" ? [`${l.fontStyle} 40px "${l.fontFamily}"`] : [])))].join("|");
+  const faces = fontFaces(canvas).join("|");
   useEffect(() => {
     if (!faces) return;
     Promise.all(faces.split("|").map((f) => document.fonts.load(f).catch(() => []))).then(() => setFontTick((t) => t + 1));
@@ -368,7 +383,7 @@ export default function CanvasStage({
       const height = img.naturalHeight * k;
       const cx = at?.x ?? W / 2;
       const cy = at?.y ?? H / 2;
-      add({ ...baseLayer(cx - width / 2, cy - height / 2), kind: "image", name: product.name, product_id: product.id, url, width, height });
+      add({ ...baseLayer(cx - width / 2, cy - height / 2), kind: "image", name: product.name, product_id: product.id, url, width, height, fit: "stretch" });
     } catch {
       setToast({ kind: "error", text: "That image could not be loaded. If it's an external link, upload it to the product instead." });
     }
@@ -376,9 +391,8 @@ export default function CanvasStage({
 
   const uploadBackground = async (file: File) => {
     const fd = new FormData();
-    fd.set("hamperId", hamperId);
     fd.set("file", file);
-    const res = await uploadHamperBackground(fd);
+    const res = await onUpload(fd);
     if (res.error || !res.url) return setToast({ kind: "error", text: res.error ?? "Upload failed." });
     change((c) => ({ ...c, background: { ...c.background, image_url: res.url! } }));
   };
@@ -479,29 +493,71 @@ export default function CanvasStage({
     });
   }
 
-  async function save() {
-    if (saving) return;
+  /** Saves the design (and its PNG, when asked for). Resolves false if it didn't save. */
+  async function save(): Promise<boolean> {
+    if (saving) return false;
     setSaving(true);
     setEditingId(null);
     try {
-      let blob: Blob;
-      try {
-        blob = await renderPng();
-      } catch {
-        return setToast({ kind: "error", text: "Export blocked by an image from another website. Upload that image to the product instead." });
-      }
       const doc = canvas;
       const fd = new FormData();
-      fd.set("hamperId", hamperId);
       fd.set("canvas", JSON.stringify(doc));
-      fd.set("png", new File([blob], "cover.png", { type: "image/png" }));
-      const res = await saveHamperCanvas(fd);
-      if (res.error) return setToast({ kind: "error", text: res.error });
+      if (saveImage) {
+        try {
+          fd.set("png", new File([await renderPng()], "image.png", { type: "image/png" }));
+        } catch {
+          setToast({ kind: "error", text: "Export blocked by an image from another website. Upload that image to the product instead." });
+          return false;
+        }
+      }
+      const res = await onSave(fd);
+      if (res.error) {
+        setToast({ kind: "error", text: res.error });
+        return false;
+      }
       setSavedCanvas(doc);
-      setToast({ kind: "ok", text: "Saved. The hamper image is updated." });
+      setToast({ kind: "ok", text: savedMessage });
+      return true;
     } finally {
       setSaving(false);
     }
+  }
+
+  /** Switch to another page of the deck, saving this one first. */
+  async function goTo(href: string) {
+    if (dirty && !(await save())) return;
+    router.push(href);
+  }
+
+  /** Drag a page edge or corner to resize it; the zoom and top-left corner stay put. */
+  function startPageResize(e: React.PointerEvent<HTMLDivElement>, edge: "e" | "s" | "se") {
+    e.preventDefault();
+    e.stopPropagation();
+    const el = e.currentTarget;
+    el.setPointerCapture(e.pointerId);
+    const z = zoom;
+    const start = { x: e.clientX, y: e.clientY, w: W, h: H, panX: view.panX, panY: view.panY };
+    const size = (v: number) => Math.round(Math.min(8000, Math.max(100, v)));
+    setResizingPage(true);
+    const move = (ev: PointerEvent) => {
+      const w = edge === "s" ? start.w : size(start.w + (ev.clientX - start.x) / z);
+      // Shift on the corner keeps the page's proportions.
+      const h =
+        edge === "e"
+          ? start.h
+          : edge === "se" && ev.shiftKey
+            ? size((w * start.h) / start.w)
+            : size(start.h + (ev.clientY - start.y) / z);
+      change((c) => (c.width === w && c.height === h ? c : { ...c, width: w, height: h }), "page-size");
+      setView({ zoom: z, panX: start.panX + ((w - start.w) * z) / 2, panY: start.panY + ((h - start.h) * z) / 2 });
+    };
+    const up = () => {
+      el.removeEventListener("pointermove", move);
+      el.removeEventListener("pointerup", up);
+      setResizingPage(false);
+    };
+    el.addEventListener("pointermove", move);
+    el.addEventListener("pointerup", up);
   }
 
   async function download() {
@@ -509,7 +565,7 @@ export default function CanvasStage({
       const url = URL.createObjectURL(await renderPng());
       const a = document.createElement("a");
       a.href = url;
-      a.download = `${hamperCode}.png`;
+      a.download = `${downloadName}.png`;
       a.click();
       URL.revokeObjectURL(url);
     } catch {
@@ -645,7 +701,6 @@ export default function CanvasStage({
   }, [editing?.text, editing?.fontSize, editing?.width, zoom, editingId]);
 
   const bgImage = useImage(canvas.background.image_url);
-  const bgCover = bgImage ? Math.max(W / bgImage.naturalWidth, H / bgImage.naturalHeight) : 1;
 
   /** Write nodes' on-screen position/rotation/scale back to the document, as one undo step. */
   const commitNodes = (ids: string[]) =>
@@ -788,9 +843,9 @@ export default function CanvasStage({
   return (
     <div className="studio fixed inset-0 z-[60] flex flex-col bg-[var(--st-bg)]">
       {/* Top bar */}
-      <header className="flex h-12 shrink-0 items-center gap-1 border-b border-[var(--st-line)] bg-[var(--st-panel)] px-2">
+      <header className="studio-topbar flex h-12 shrink-0 items-center gap-1 px-2">
         <Link
-          href={`/hampers/${encodeURIComponent(hamperCode)}`}
+          href={backHref}
           className={toolBtn}
           onClick={(e) => {
             if (dirty && !confirm("You have unsaved changes. Leave without saving?")) e.preventDefault();
@@ -800,8 +855,8 @@ export default function CanvasStage({
         </Link>
         <span className="mx-2 h-5 w-px bg-[var(--st-line)]" />
         <div className="mr-3 min-w-0">
-          <div className="truncate text-[13px] font-semibold leading-tight">{hamperName}</div>
-          <div className="text-[11px] leading-tight text-[var(--st-muted)]">{hamperCode}</div>
+          <div className="truncate text-[13px] font-semibold leading-tight">{title}</div>
+          {subtitle && <div className="text-[11px] leading-tight text-[var(--st-muted)]">{subtitle}</div>}
         </div>
         <ToolButton title="Undo (Ctrl+Z)" disabled={!hist.past.length} onClick={() => setHist(undo)}>
           <Undo2 className="h-4 w-4" />
@@ -809,9 +864,19 @@ export default function CanvasStage({
         <ToolButton title="Redo (Ctrl+Shift+Z)" disabled={!hist.future.length} onClick={() => setHist(redo)}>
           <Redo2 className="h-4 w-4" />
         </ToolButton>
-        <Popover title="Resize" width={260} trigger={<><Scaling className="h-4 w-4" /> Resize</>}>
+        <Popover title="Resize" width={280} trigger={<><Scaling className="h-4 w-4" /> Resize</>}>
           {(close) => (
             <div className="space-y-1">
+              <CustomSize
+                width={W}
+                height={H}
+                onApply={(width, height) => {
+                  change((c) => ({ ...c, width, height }));
+                  zoomFit();
+                  close();
+                }}
+              />
+              <div className={cx(panelTitle, "px-2 pb-1 pt-1")}>Presets</div>
               {CANVAS_PRESETS.map((p) => (
                 <button
                   key={p.label}
@@ -935,95 +1000,32 @@ export default function CanvasStage({
                     width={W * zoom}
                     height={H * zoom}
                     fill="#ffffff"
-                    shadowColor="#000000"
-                    shadowBlur={40}
-                    shadowOpacity={0.55}
+                    shadowColor={STUDIO_COLORS.pageShadow}
+                    shadowBlur={30}
+                    shadowOpacity={0.18}
                     listening={false}
                   />
 
                   <Group ref={pageRef} x={ox} y={oy} scaleX={zoom} scaleY={zoom} clipX={0} clipY={0} clipWidth={W} clipHeight={H}>
                     <Rect name="bg" width={W} height={H} {...fillProps(canvas.background.fill, W, H)} />
-                    {bgImage && (
-                      <KImage
-                        image={bgImage}
-                        listening={false}
-                        width={bgImage.naturalWidth * bgCover}
-                        height={bgImage.naturalHeight * bgCover}
-                        x={(W - bgImage.naturalWidth * bgCover) / 2}
-                        y={(H - bgImage.naturalHeight * bgCover) / 2}
-                      />
-                    )}
+                    {bgImage && <KImage image={bgImage} listening={false} {...backgroundImageAttrs(canvas, bgImage)} />}
 
                     {canvas.layers.map((l) => {
-                      const stroke = "stroke" in l ? { stroke: l.stroke, strokeWidth: l.strokeWidth } : {};
-                      switch (l.kind) {
-                        case "image":
-                          return <LayerImage key={l.id} layer={l} common={common(l)} />;
-                        case "text":
-                          return (
-                            <Text
-                              key={`${l.id}:${fontTick}`}
-                              {...common(l)}
-                              text={l.text}
-                              fontSize={l.fontSize}
-                              fontFamily={l.fontFamily}
-                              fontStyle={l.fontStyle}
-                              align={l.align}
-                              width={l.width}
-                              letterSpacing={l.letterSpacing}
-                              lineHeight={l.lineHeight}
-                              onDblClick={() => !l.locked && setEditingId(l.id)}
-                              onDblTap={() => !l.locked && setEditingId(l.id)}
-                              {...fillProps(l.fill, l.width, l.fontSize * l.lineHeight * l.text.split("\n").length)}
-                            />
-                          );
-                        case "rect":
-                          return (
-                            <Rect
-                              key={l.id}
-                              {...common(l)}
-                              {...stroke}
-                              width={l.width}
-                              height={l.height}
-                              cornerRadius={l.cornerRadius}
-                              {...fillProps(l.fill, l.width, l.height)}
-                            />
-                          );
-                        case "ellipse":
-                          return (
-                            <Ellipse
-                              key={l.id}
-                              {...common(l)}
-                              {...stroke}
-                              radiusX={l.radiusX}
-                              radiusY={l.radiusY}
-                              {...fillProps(l.fill, l.radiusX * 2, l.radiusY * 2, -l.radiusX, -l.radiusY)}
-                            />
-                          );
-                        case "polygon":
-                          return (
-                            <RegularPolygon
-                              key={l.id}
-                              {...common(l)}
-                              {...stroke}
-                              sides={l.sides}
-                              radius={l.radius}
-                              {...fillProps(l.fill, l.radius * 2, l.radius * 2, -l.radius, -l.radius)}
-                            />
-                          );
-                        case "star":
-                          return (
-                            <Star
-                              key={l.id}
-                              {...common(l)}
-                              {...stroke}
-                              numPoints={l.numPoints}
-                              innerRadius={l.innerRadius}
-                              outerRadius={l.outerRadius}
-                              {...fillProps(l.fill, l.outerRadius * 2, l.outerRadius * 2, -l.outerRadius, -l.outerRadius)}
-                            />
-                          );
+                      if (l.kind === "image") return <LayerImage key={l.id} layer={l} common={common(l)} />;
+                      const { shape, attrs } = layerConfig(l);
+                      if (l.kind === "text") {
+                        return (
+                          <Text
+                            key={`${l.id}:${fontTick}`}
+                            {...attrs}
+                            {...common(l)}
+                            onDblClick={() => !l.locked && setEditingId(l.id)}
+                            onDblTap={() => !l.locked && setEditingId(l.id)}
+                          />
+                        );
                       }
+                      const Shape = KONVA_SHAPES[shape as keyof typeof KONVA_SHAPES];
+                      return <Shape key={l.id} {...attrs} {...common(l)} />;
                     })}
                   </Group>
 
@@ -1033,10 +1035,10 @@ export default function CanvasStage({
                       <Rect {...hover} stroke={ACCENT} strokeWidth={1.5 / zoom} dash={[4 / zoom, 3 / zoom]} />
                     )}
                     {guides?.vertical.map((x) => (
-                      <Line key={`v${x}`} points={[x, -40 / zoom, x, H + 40 / zoom]} stroke="#ff3b8d" strokeWidth={1 / zoom} />
+                      <Line key={`v${x}`} points={[x, -40 / zoom, x, H + 40 / zoom]} stroke={STUDIO_COLORS.guide} strokeWidth={1 / zoom} />
                     ))}
                     {guides?.horizontal.map((y) => (
-                      <Line key={`h${y}`} points={[-40 / zoom, y, W + 40 / zoom, y]} stroke="#ff3b8d" strokeWidth={1 / zoom} />
+                      <Line key={`h${y}`} points={[-40 / zoom, y, W + 40 / zoom, y]} stroke={STUDIO_COLORS.guide} strokeWidth={1 / zoom} />
                     ))}
                   </Group>
 
@@ -1055,8 +1057,8 @@ export default function CanvasStage({
                     anchorCornerRadius={5}
                     anchorStroke={ACCENT}
                     anchorStrokeWidth={1.5}
-                    anchorFill="#ffffff"
-                    borderStroke={selected?.locked ? "#9b9ea6" : ACCENT}
+                    anchorFill={STUDIO_COLORS.handleFill}
+                    borderStroke={selected?.locked ? STUDIO_COLORS.locked : ACCENT}
                     borderStrokeWidth={1.5}
                     boundBoxFunc={(oldBox, newBox) => (Math.abs(newBox.width) < 8 || Math.abs(newBox.height) < 8 ? oldBox : newBox)}
                   />
@@ -1097,6 +1099,33 @@ export default function CanvasStage({
               />
             )}
 
+            {board.w > 0 && !editing &&
+              (["e", "s", "se"] as const).map((edge) => (
+                <div
+                  key={edge}
+                  title="Drag to resize the page (Shift on the corner keeps proportions)"
+                  onPointerDown={(e) => startPageResize(e, edge)}
+                  className={cx(
+                    "absolute z-10 -translate-x-1/2 -translate-y-1/2 border-2 border-[var(--st-accent)] bg-[var(--st-panel)] shadow-sm hover:bg-[var(--st-gold)]",
+                    edge === "se" && "h-4 w-4 cursor-nwse-resize rounded-full",
+                    edge === "e" && "h-9 w-2.5 cursor-ew-resize rounded-full",
+                    edge === "s" && "h-2.5 w-9 cursor-ns-resize rounded-full",
+                  )}
+                  style={{
+                    left: edge === "s" ? ox + (W * zoom) / 2 : ox + W * zoom,
+                    top: edge === "e" ? oy + (H * zoom) / 2 : oy + H * zoom,
+                  }}
+                />
+              ))}
+            {resizingPage && (
+              <div
+                className="pointer-events-none absolute z-10 rounded-md bg-[var(--st-accent-strong)] px-2 py-1 text-[12px] tabular-nums text-[var(--st-on-accent)] shadow"
+                style={{ left: ox + W * zoom + 14, top: oy + H * zoom + 14 }}
+              >
+                {W} × {H} px
+              </div>
+            )}
+
             {marquee && (
               <div
                 className="pointer-events-none absolute rounded-sm border border-[var(--st-accent)] bg-[var(--st-accent-soft)]"
@@ -1105,7 +1134,7 @@ export default function CanvasStage({
             )}
 
             {swapId && (
-              <div className="pointer-events-none absolute left-1/2 top-3 -translate-x-1/2 rounded-full bg-[var(--st-accent)] px-4 py-1.5 text-[12px] font-medium text-white shadow-lg">
+              <div className="pointer-events-none absolute left-1/2 top-3 -translate-x-1/2 rounded-full bg-[var(--st-accent)] px-4 py-1.5 text-[12px] font-medium text-[var(--st-on-accent)] shadow-lg">
                 Choose a new image from the Products panel
               </div>
             )}
@@ -1115,13 +1144,40 @@ export default function CanvasStage({
                 role="status"
                 className={cx(
                   "absolute bottom-4 left-1/2 max-w-md -translate-x-1/2 rounded-lg px-4 py-2.5 text-[13px] shadow-2xl",
-                  toast.kind === "error" ? "bg-red-600 text-white" : "bg-[#f4f4f5] text-[#18181b]",
+                  toast.kind === "error" ? "bg-red-700 text-white" : "bg-[var(--st-accent-strong)] text-[var(--st-on-accent)]",
                 )}
               >
                 {toast.text}
               </div>
             )}
           </div>
+
+          {pages && pages.length > 0 && (
+            <div className="flex shrink-0 items-center gap-3 overflow-x-auto border-t border-[var(--st-line)] bg-[var(--st-panel)] px-3 py-2">
+              {pages.map((p, i) => {
+                const current = p.id === pageId;
+                return (
+                  <button
+                    key={p.id}
+                    type="button"
+                    onClick={() => !current && goTo(p.href)}
+                    title={current ? "This slide" : `Go to slide ${i + 1}${dirty ? " (saves this one first)" : ""}`}
+                    className="group flex shrink-0 flex-col items-center gap-1"
+                  >
+                    <SlideThumb
+                      canvas={current ? savedCanvas : p.canvas}
+                      width={112}
+                      className={cx(
+                        "rounded border-2",
+                        current ? "border-[var(--st-accent)]" : "border-transparent group-hover:border-[var(--st-muted)]",
+                      )}
+                    />
+                    <span className={cx("text-[11px] tabular-nums", current ? "font-semibold" : "text-[var(--st-muted)]")}>{i + 1}</span>
+                  </button>
+                );
+              })}
+            </div>
+          )}
 
           {/* Bottom bar */}
           <footer className="flex h-10 shrink-0 items-center gap-2 border-t border-[var(--st-line)] bg-[var(--st-panel)] px-3">
@@ -1136,8 +1192,16 @@ export default function CanvasStage({
                 ))}
               </dl>
             </Popover>
+            <PageSizeInputs
+              width={W}
+              height={H}
+              onChange={(width, height) => {
+                change((c) => ({ ...c, width, height }));
+                zoomFit();
+              }}
+            />
             <span className="text-[12px] text-[var(--st-muted)]">
-              {W} × {H} px · {canvas.layers.length} layer{canvas.layers.length === 1 ? "" : "s"}
+              · {canvas.layers.length} layer{canvas.layers.length === 1 ? "" : "s"}
             </span>
             <div className="ml-auto flex items-center gap-1">
               <ToolButton title="Zoom out (Ctrl+-)" className="h-7 w-7 px-0" onClick={() => zoomTo((z) => z / 1.25)}>
@@ -1227,7 +1291,7 @@ function ContextMenu({ x, y, items, onClose }: { x: number; y: number; items: Me
   return (
     <div
       role="menu"
-      className="studio fixed z-[70] w-56 rounded-lg border border-[var(--st-line)] bg-[var(--st-panel)] p-1 shadow-2xl shadow-black/60"
+      className="studio fixed z-[70] w-56 rounded-lg border border-[var(--st-line)] bg-[var(--st-panel)] p-1 shadow-xl shadow-[#2c332f]/15"
       style={{ left, top }}
       onPointerDown={(e) => e.stopPropagation()}
       onContextMenu={(e) => e.preventDefault()}
@@ -1256,7 +1320,45 @@ function ContextMenu({ x, y, items, onClose }: { x: number; y: number; items: Me
   );
 }
 
+const KONVA_SHAPES = { Rect, Ellipse, RegularPolygon, Star } as unknown as Record<
+  "Rect" | "Ellipse" | "RegularPolygon" | "Star",
+  React.ComponentType<Record<string, unknown>>
+>;
+
 function LayerImage({ layer, common }: { layer: Extract<Layer, { kind: "image" }>; common: Record<string, unknown> }) {
   const img = useImage(layer.url);
-  return <KImage {...common} image={img} width={layer.width} height={layer.height} />;
+  return <KImage {...layerConfig(layer, img).attrs} {...common} image={img} />;
+}
+
+/** Width × height boxes in the Resize menu. */
+function CustomSize({ width, height, onApply }: { width: number; height: number; onApply: (w: number, h: number) => void }) {
+  const [w, setW] = useState(String(width));
+  const [h, setH] = useState(String(height));
+  const valid = (v: string) => /^\d+$/.test(v.trim()) && Number(v) >= 100 && Number(v) <= 8000;
+  const ok = valid(w) && valid(h);
+  const box = cx(fieldCls, "w-[72px] text-right tabular-nums");
+
+  return (
+    <form
+      className="mb-1 border-b border-[var(--st-line)] px-2 pb-3"
+      onSubmit={(e) => {
+        e.preventDefault();
+        if (ok) onApply(Number(w), Number(h));
+      }}
+    >
+      <div className={cx(panelTitle, "mb-1.5")}>Custom size</div>
+      <div className="flex items-center gap-1.5">
+        <input aria-label="Page width in pixels" inputMode="numeric" className={box} value={w} onChange={(e) => setW(e.target.value)} />
+        <span className="text-[var(--st-muted)]">×</span>
+        <input aria-label="Page height in pixels" inputMode="numeric" className={box} value={h} onChange={(e) => setH(e.target.value)} />
+        <span className="text-[11px] text-[var(--st-muted)]">px</span>
+        <button type="submit" className={cx(accentBtn, "ml-auto px-2.5")} disabled={!ok}>
+          Apply
+        </button>
+      </div>
+      <p className="mt-1.5 text-[11px] leading-snug text-[var(--st-muted)]">
+        100–8000 px. You can also drag the handles on the page&apos;s right and bottom edges.
+      </p>
+    </form>
+  );
 }

@@ -26,7 +26,7 @@ export function Rail({ tab, onTab }: { tab: SideTab | null; onTab: (t: SideTab |
           onClick={() => onTab(tab === id ? null : id)}
           className={cx(
             "flex w-[62px] flex-col items-center gap-1 rounded-lg py-2 text-[10.5px] transition-colors",
-            tab === id ? "bg-[var(--st-panel-2)] text-white" : "text-[var(--st-muted)] hover:text-white",
+            tab === id ? "bg-[var(--st-panel-2)] text-[var(--st-text)]" : "text-[var(--st-muted)] hover:text-[var(--st-text)]",
           )}
         >
           <Icon className={cx("h-5 w-5", tab === id && "text-[var(--st-accent)]")} strokeWidth={1.8} />
@@ -176,8 +176,8 @@ function ProductsPanel({
                 className={cx(
                   "rounded-full border px-3 py-1 text-[12px]",
                   scope === id
-                    ? "border-[var(--st-accent)] bg-[var(--st-accent-soft)] text-white"
-                    : "border-[var(--st-line)] text-[var(--st-muted)] hover:text-white",
+                    ? "border-[var(--st-accent)] bg-[var(--st-accent-soft)] text-[var(--st-accent-strong)]"
+                    : "border-[var(--st-line)] text-[var(--st-muted)] hover:text-[var(--st-text)]",
                 )}
               >
                 {label}
@@ -244,7 +244,7 @@ function TextPanel({ ed }: { ed: Editor }) {
               key={t.text}
               type="button"
               onClick={() => ed.add(makeText(ed.canvas, t.text, t.style))}
-              className="flex aspect-[4/3] items-center justify-center overflow-hidden rounded-md bg-[#faf8ee] p-2 text-center leading-tight hover:ring-2 hover:ring-[var(--st-accent)]"
+              className="flex aspect-[4/3] items-center justify-center overflow-hidden rounded-md border border-[var(--st-line)] bg-white p-2 text-center leading-tight hover:ring-2 hover:ring-[var(--st-accent)]"
               style={{
                 fontFamily: t.style.fontFamily,
                 color: t.style.color,

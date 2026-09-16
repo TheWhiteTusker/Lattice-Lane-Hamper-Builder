@@ -7,6 +7,9 @@ import type {
 
 export type PickerProduct = { id: string; code: string; name: string; image_url: string | null };
 
+/** What the editor's save and upload server actions return. */
+export type ActionResult = { ok?: boolean; error?: string; url?: string };
+
 /** Everything the panels and toolbars can do to the design. Built in canvas-stage.tsx. */
 export type Editor = {
   canvas: HamperCanvas;
