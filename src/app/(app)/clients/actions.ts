@@ -67,13 +67,7 @@ export async function deleteClient(
 
 export type GstDetails = { name: string; billing_address: string };
 
-/**
- * Company name and address for a GSTIN.
- *
- * ponytail: not connected yet. Call the GST API here and return
- * { details: { name, billing_address } } - the client form already fills
- * both fields from whatever this returns.
- */
+/** Company name and address for a GSTIN, from gstinapi.in. */
 export async function lookupGstin(
   gstin: string,
 ): Promise<{ error?: string; details?: GstDetails }> {
@@ -82,5 +76,41 @@ export async function lookupGstin(
   const value = gstin.trim().toUpperCase();
   if (!GSTIN.test(value)) return { error: "Enter a valid 15-character GSTIN first." };
 
-  return { error: "GST lookup is not connected yet. Enter the name and address by hand." };
+  const key = process.env.GSTIN_API_KEY;
+  if (!key) return { error: "GST lookup is not configured. Enter the name and address by hand." };
+
+  let response: Response;
+  try {
+    // ponytail: one attempt. The API asks for backoff on 429/502, which is
+    // worth adding only if this stops being a button someone presses by hand.
+    response = await fetch(`https://www.gstinapi.in/v1/gstin/${value}`, {
+      headers: { "x-api-key": key },
+      signal: AbortSignal.timeout(10_000),
+    });
+  } catch {
+    return { error: "Could not reach the GST service. Enter the details by hand." };
+  }
+
+  // Parsed leniently on purpose: the API adds fields without notice.
+  const body = (await response.json().catch(() => null)) as {
+    success?: boolean;
+    error?: string;
+    data?: Record<string, string | null>;
+  } | null;
+
+  if (!response.ok || !body?.success || !body.data) {
+    // The API returns a human-readable reason on every failure — better than
+    // anything guessed from the status code, e.g. an unverified-email 402 that
+    // says which button to press rather than "out of credits".
+    return { error: body?.error ?? "GST lookup failed. Enter the details by hand." };
+  }
+
+  const { trade_name, legal_name, address, pincode } = body.data;
+
+  return {
+    details: {
+      name: trade_name || legal_name || "",
+      billing_address: [address, pincode].filter(Boolean).join(" - "),
+    },
+  };
 }
