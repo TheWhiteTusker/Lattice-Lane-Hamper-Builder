@@ -72,6 +72,7 @@ export default async function HampersPage({ searchParams }: { searchParams: Sear
         <table className="table min-w-[1200px]">
           <thead>
             <tr>
+              <th className="w-14"></th>
               <th>Code</th>
               <th>Hamper</th>
               <th>Collection</th>
@@ -84,6 +85,7 @@ export default async function HampersPage({ searchParams }: { searchParams: Sear
             </tr>
 
             <tr>
+              <th className="pb-2"></th>
               <th colSpan={2} className="pb-2">
                 <input
                   name="q"
@@ -143,7 +145,7 @@ export default async function HampersPage({ searchParams }: { searchParams: Sear
           <tbody>
             {rows.length === 0 ? (
               <tr>
-                <td colSpan={9} className="py-10 text-center text-sm text-[var(--color-muted)]">
+                <td colSpan={10} className="py-10 text-center text-sm text-[var(--color-muted)]">
                   {filtered ? "No hampers match that search." : "No hampers yet."}
                   {manage && !filtered && (
                     <Link href="/hampers/new" className="ml-2 underline">
@@ -155,6 +157,21 @@ export default async function HampersPage({ searchParams }: { searchParams: Sear
             ) : (
               rows.map((h) => (
                 <tr key={h.id}>
+                  <td>
+                    <Link href={`/hampers/${encodeURIComponent(h.code)}`} className="block h-10 w-10">
+                      {h.image_url ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={h.image_url}
+                          alt=""
+                          loading="lazy"
+                          className="h-10 w-10 rounded-md border border-[var(--color-line)] object-cover"
+                        />
+                      ) : (
+                        <span className="block h-10 w-10 rounded-md border border-dashed border-[var(--color-line)] bg-[var(--color-paper)]" />
+                      )}
+                    </Link>
+                  </td>
                   <td className="font-mono whitespace-nowrap">
                     <Link href={`/hampers/${encodeURIComponent(h.code)}`} className="hover:underline">
                       {h.code}

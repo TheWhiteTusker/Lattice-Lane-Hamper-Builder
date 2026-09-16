@@ -412,6 +412,17 @@ export function HamperBuilder({
       {/* Kept outside the builder form so these never submit the hamper. */}
       {hamper && canEdit && (
         <div className="mt-4 flex flex-wrap items-center gap-2">
+          {hamper.image_url && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={hamper.image_url}
+              alt={`${hamper.name} image`}
+              className="h-16 w-16 rounded-md border border-[var(--color-line)] object-cover"
+            />
+          )}
+          <Link href={`/hampers/${encodeURIComponent(hamper.code)}/image`} className="btn-secondary">
+            {hamper.image_url ? "Edit image" : "Design image"}
+          </Link>
           <Link href={`/quotes/new?hamper=${encodeURIComponent(hamper.code)}`} className="btn-secondary">
             Add to a quote
           </Link>

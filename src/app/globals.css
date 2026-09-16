@@ -180,3 +180,36 @@ body {
     display: table-header-group;
   }
 }
+
+/* Hamper image designer: dark editor chrome in the Canva / After Effects
+   mould, so the page being designed is the brightest thing on screen. */
+.studio {
+  --st-bg: #0e0f11;
+  --st-panel: #1a1b1e;
+  --st-panel-2: #24262a;
+  --st-hover: #2e3035;
+  --st-line: #33363c;
+  --st-text: #ececef;
+  --st-muted: #9b9ea6;
+  --st-accent: #8b5cf6;
+  --st-accent-soft: rgb(139 92 246 / 0.18);
+  color-scheme: dark;
+  color: var(--st-text);
+  font-size: 13px;
+}
+
+.studio input[type="range"] {
+  accent-color: var(--st-accent);
+}
+
+/* Transparency grid behind images, as in every image editor. */
+.studio .checkerboard {
+  background-color: #2a2c31;
+  background-image:
+    linear-gradient(45deg, #34363c 25%, transparent 25%),
+    linear-gradient(-45deg, #34363c 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, #34363c 75%),
+    linear-gradient(-45deg, transparent 75%, #34363c 75%);
+  background-size: 12px 12px;
+  background-position: 0 0, 0 6px, 6px -6px, -6px 0;
+}
