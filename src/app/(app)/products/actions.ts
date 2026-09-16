@@ -9,7 +9,6 @@ import {
   type ActionState,
   optionalText,
   money,
-  percent,
   checkbox,
   describeError,
 } from "@/lib/forms";
@@ -25,7 +24,6 @@ const ProductSchema = z.object({
   source: optionalText,
   cost_price: money,
   markup_pct: z.coerce.number().default(0),
-  target_margin: percent,
   default_sp: money,
   colors: z.array(z.string()).default([]),
   is_active: checkbox,
@@ -44,7 +42,13 @@ export async function saveProduct(
     return { error: parsed.error.issues[0].message };
   }
 
-  const { id, ...values } = parsed.data;
+  const { id, ...fields } = parsed.data;
+  // Margin is no longer entered on the form; it is still stored because hamper
+  // costing snapshots it, so keep it in step with the price actually set.
+  const values = {
+    ...fields,
+    target_margin: fields.default_sp > 0 ? Math.round(((fields.default_sp - fields.cost_price) / fields.default_sp) * 10000) / 10000 : 0,
+  };
   const supabase = await createClient();
 
   // A new product in several colours becomes one row per colour, each with its

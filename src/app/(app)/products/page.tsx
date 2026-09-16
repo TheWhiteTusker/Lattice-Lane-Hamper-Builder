@@ -2,7 +2,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { requireUser, isAdmin } from "@/lib/supabase/server";
 import { PageHeader, EmptyState } from "@/components/ui";
-import { formatMoney, formatPct } from "@/lib/pricing";
+import { formatMoney } from "@/lib/pricing";
 import { LoadMore } from "@/components/load-more";
 import { pageLimit } from "@/lib/paging";
 import type { Category, ProductWithCategory } from "@/lib/types";
@@ -123,7 +123,6 @@ export default async function ProductsPage({ searchParams }: { searchParams: Sea
                 <th>Source</th>
                 <th className="num">Cost</th>
                 <th className="num">Markup</th>
-                <th className="num">Margin</th>
                 <th className="num">Selling price</th>
                 <th></th>
               </tr>
@@ -179,7 +178,6 @@ export default async function ProductsPage({ searchParams }: { searchParams: Sea
                   <td className="text-[var(--color-muted)]">{p.source ?? "—"}</td>
                   <td className="num">{formatMoney(p.cost_price)}</td>
                   <td className="num">{p.markup_pct != null ? `${p.markup_pct}%` : "—"}</td>
-                  <td className="num">{formatPct(p.target_margin, 0)}</td>
                   <td className="num">{formatMoney(p.default_sp)}</td>
                   <td className="num">
                     <div className="flex items-center justify-end gap-2.5">

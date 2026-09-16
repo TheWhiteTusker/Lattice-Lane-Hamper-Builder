@@ -40,9 +40,6 @@ export function ProductForm({
         ? String(round2(((product.default_sp - product.cost_price) / product.cost_price) * 100))
         : "100",
   );
-  const [margin, setMargin] = useState(
-    product ? String(round2(product.target_margin * 100)) : "",
-  );
   const [sellingPrice, setSellingPrice] = useState(String(product?.default_sp ?? ""));
   const [source, setSource] = useState(product?.source ?? "");
   const [selectedColors, setSelectedColors] = useState<string[]>(
@@ -55,22 +52,7 @@ export function ProductForm({
     const cp = Number(costPrice);
     const m = Number(val ?? markup);
     if (!Number.isFinite(cp) || !Number.isFinite(m)) return;
-    const sp = round2(cp * (1 + m / 100));
-    setSellingPrice(String(sp));
-    if (sp > 0) {
-      setMargin(String(round2(((sp - cp) / sp) * 100)));
-    }
-  }
-
-  function applyMargin(val?: string) {
-    const cp = Number(costPrice);
-    const m = Number(val ?? margin) / 100;
-    if (!Number.isFinite(cp) || !Number.isFinite(m) || m >= 1) return;
-    const sp = round2(cp / (1 - m));
-    setSellingPrice(String(sp));
-    if (cp > 0) {
-      setMarkup(String(round2(((sp - cp) / cp) * 100)));
-    }
+    setSellingPrice(String(round2(cp * (1 + m / 100))));
   }
 
   function handleSpChange(val: string) {
@@ -79,7 +61,6 @@ export function ProductForm({
     const cp = Number(costPrice);
     if (Number.isFinite(sp) && Number.isFinite(cp) && cp > 0 && sp > 0) {
       setMarkup(String(round2(((sp - cp) / cp) * 100)));
-      setMargin(String(round2(((sp - cp) / sp) * 100)));
     }
   }
 
@@ -318,30 +299,6 @@ export function ProductForm({
               <button
                 type="button"
                 onClick={() => applyMarkup()}
-                className="btn-secondary whitespace-nowrap"
-              >
-                Apply
-              </button>
-            </div>
-          </div>
-
-          {/* Target Margin % */}
-          <div>
-            <label className="label" htmlFor="target_margin">
-              Target margin %
-            </label>
-            <div className="mt-1 flex gap-2">
-              <input
-                id="target_margin"
-                name="target_margin"
-                inputMode="decimal"
-                value={margin}
-                onChange={(e) => setMargin(e.target.value)}
-                className="input input-num font-mono"
-              />
-              <button
-                type="button"
-                onClick={() => applyMargin()}
                 className="btn-secondary whitespace-nowrap"
               >
                 Apply
