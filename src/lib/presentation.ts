@@ -1,40 +1,60 @@
-import { formatMoney } from "./pricing.ts";
 import type { Fill, HamperCanvas, Layer } from "./hamper-canvas.ts";
 
 /*
- * Presentation decks: an entry slide, one slide per hamper or product, and a
- * closing slide. Each slide is an ordinary designer canvas, so the photo
- * editor edits them like any hamper image.
+ * Presentation decks in the house format ("Premium Gift Hamper Deck 2026"):
+ * a green entry slide, one white slide per hamper or product with the photos
+ * standing on a green band, and a green thank-you slide. Every slide is an
+ * ordinary designer canvas, so the photo editor edits them afterwards.
+ *
+ * The layout needs each photo's real proportions, so slides are generated in
+ * the browser once the images have loaded (see presentations/build-slides.ts).
  */
 
 export const SLIDE = { width: 1920, height: 1080 } as const;
 
-const INK = "#2c332f";
-const SAGE = "#54655b";
-const GOLD = "#ddcf8b";
-const BRONZE = "#b08d57";
-const CREAM = "#faf8ee";
-const SAND = "#f1ebe0";
-const MUTED = "#66756b";
+export const DECK_COLORS = {
+  green: "#b5c2b1", // the house deck's dusty pink, in Lattice Lane sage
+  heading: "#595959",
+  ink: "#1f1f1f",
+  muted: "#7f7f7f",
+  page: "#ffffff",
+} as const;
+
+export const DEFAULT_NOTE =
+  "Pricing is applicable for an MOQ of 100 units. Estimated delivery: 15 working days from design approval and advance payment confirmation.";
+
+export type Size = { width: number; height: number };
+export type Photo = { url: string; size: Size };
+
+export type DeckItemInfo = {
+  product_id: string | null;
+  name: string;
+  /** Small line under the name, e.g. the product's category. */
+  caption: string;
+  image_url: string | null;
+};
 
 export type HamperInfo = {
   id: string;
   code: string;
   name: string;
-  collection: string | null;
   price: number | null;
+  /** The hamper's own designed picture, used when no product has a photo. */
   image_url: string | null;
-  contents: { name: string; qty: number }[];
+  items: DeckItemInfo[];
 };
 
 export type ProductInfo = {
   id: string;
   code: string;
   name: string;
+  caption: string;
   price: number | null;
   image_url: string | null;
-  colors: string[];
 };
+
+/** Looks up a loaded photo's natural size; undefined if it didn't load. */
+export type SizeOf = (url: string) => Size | undefined;
 
 let seq = 0;
 const nextId = () => `s${Date.now().toString(36)}${(seq++).toString(36)}`;
@@ -54,14 +74,15 @@ const base = (x: number, y: number) => ({
 const solid = (color: string): Fill => ({ type: "solid", color });
 
 type TextOpts = {
-  font: string;
   size: number;
   color: string;
   width: number;
+  font?: string;
   style?: "normal" | "bold" | "italic" | "italic bold";
   align?: "left" | "center" | "right";
   spacing?: number;
   lineHeight?: number;
+  underline?: boolean;
   name?: string;
 };
 
@@ -70,17 +91,18 @@ const text = (value: string, x: number, y: number, o: TextOpts): Layer => ({
   kind: "text",
   name: o.name,
   text: value,
-  fontFamily: o.font,
+  fontFamily: o.font ?? "Arial",
   fontSize: o.size,
   fontStyle: o.style ?? "normal",
   align: o.align ?? "left",
   width: o.width,
   letterSpacing: o.spacing ?? 0,
   lineHeight: o.lineHeight ?? 1.15,
+  textDecoration: o.underline ? "underline" : "none",
   fill: solid(o.color),
 });
 
-const rect = (x: number, y: number, width: number, height: number, color: string, name?: string): Layer => ({
+const rect = (x: number, y: number, width: number, height: number, color: string, name: string): Layer => ({
   ...base(x, y),
   kind: "rect",
   name,
@@ -88,121 +110,263 @@ const rect = (x: number, y: number, width: number, height: number, color: string
   height,
   cornerRadius: 0,
   fill: solid(color),
-  stroke: INK,
+  stroke: DECK_COLORS.ink,
   strokeWidth: 0,
 });
 
-const page = (background: Fill, layers: Layer[]): HamperCanvas => ({
+const photo = (url: string, box: { x: number; y: number; width: number; height: number }, productId: string | null, name: string): Layer => ({
+  ...base(box.x, box.y),
+  kind: "image",
+  name,
+  product_id: productId,
+  url,
+  width: box.width,
+  height: box.height,
+  fit: "stretch",
+});
+
+const page = (background: string, layers: Layer[]): HamperCanvas => ({
   width: SLIDE.width,
   height: SLIDE.height,
-  background: { fill: background, image_url: null },
+  background: { fill: solid(background), image_url: null },
   layers,
 });
 
-const wordmark = (x: number, y: number, width: number, align: "left" | "center", color: string, size = 26) =>
-  text("LATTICE LANE", x, y, { font: "Cinzel", size, color, width, align, spacing: size * 0.4, name: "Wordmark" });
+/** "Essential Hamper" -> ["Essential", "Hamper"], as the deck sets its titles. */
+export function splitTitle(name: string, fallbackSubtitle: string): [string, string] {
+  const m = name.trim().match(/^(.*\S)\s+(hampers?)$/i);
+  return m ? [m[1], m[2][0].toUpperCase() + m[2].slice(1)] : [name.trim(), fallbackSubtitle];
+}
 
-export function coverSlide(title: string, subtitle: string): HamperCanvas {
-  const W = SLIDE.width;
-  return page(solid(INK), [
-    wordmark(0, 300, W, "center", GOLD, 40),
-    rect(W / 2 - 80, 385, 160, 3, GOLD, "Rule"),
-    text(title || "Our hamper collection", 160, 440, {
-      font: "Playfair Display",
-      size: 104,
-      style: "bold",
-      color: CREAM,
-      width: W - 320,
-      align: "center",
-      name: "Title",
+export const formatInr = (v: number) => `INR ${Math.round(v).toLocaleString("en-IN")}`;
+
+/* ------------------------------------------------------------ entry/closing */
+
+export function coverSlide(title: string, subtitle: string, logo: Photo | null): HamperCanvas {
+  const layers: Layer[] = [
+    text(title || "Premium", 61, 64, { size: 88, color: DECK_COLORS.heading, width: 1400, name: "Title" }),
+    text(subtitle, 61, 164, { size: 38, color: DECK_COLORS.heading, width: 1400, name: "Subtitle" }),
+  ];
+  if (logo) layers.push(logoLayer(logo, 300, "bottom-right"));
+  return page(DECK_COLORS.green, layers);
+}
+
+/** The Lattice Lane logo, `width` px wide, tucked into a corner of the slide. */
+function logoLayer(logo: Photo, width: number, corner: "bottom-right" | "bottom-left" | "top-right"): Layer {
+  const height = (width * logo.size.height) / logo.size.width;
+  const x = corner === "bottom-left" ? 86 : 1860 - width;
+  const y = corner === "top-right" ? 60 : 1010 - height;
+  return photo(logo.url, { x, y, width, height }, null, "Logo");
+}
+
+export function closingSlide(heading: string, tagline: string, contact: string, logo: Photo | null): HamperCanvas {
+  return page(DECK_COLORS.green, [
+    ...(logo ? [logoLayer(logo, 300, "top-right")] : []),
+    text(heading || "Thank You", 99, 700, { font: "Questrial", size: 112, color: "#111111", width: 900, name: "Thank you" }),
+    text(tagline, 104, 826, { font: "Questrial", size: 48, color: "#111111", width: 900, spacing: 4, name: "Tagline" }),
+    text("For any Query", 1022, 690, {
+      font: "Questrial",
+      size: 38,
+      color: "#111111",
+      width: 800,
+      align: "right",
+      underline: true,
+      name: "Query heading",
     }),
-    text(subtitle, 160, 700, { font: "Montserrat", size: 38, color: GOLD, width: W - 320, align: "center", spacing: 2, name: "Subtitle" }),
+    text(contact, 822, 752, {
+      font: "Questrial",
+      size: 34,
+      color: "#111111",
+      width: 1000,
+      align: "right",
+      spacing: 3,
+      lineHeight: 1.3,
+      name: "Contact",
+    }),
   ]);
 }
 
-export function closingSlide(title: string, contact: string): HamperCanvas {
-  const W = SLIDE.width;
-  return page(solid(INK), [
-    text(title || "Thank you", 160, 250, { font: "Great Vibes", size: 170, color: GOLD, width: W - 320, align: "center", name: "Title" }),
-    rect(W / 2 - 80, 520, 160, 3, GOLD, "Rule"),
-    text(contact, 260, 580, { font: "Montserrat", size: 36, color: CREAM, width: W - 520, align: "center", lineHeight: 1.6, name: "Contact" }),
-    wordmark(0, 960, W, "center", GOLD),
-  ]);
+/* ---------------------------------------------------------- item slides */
+
+const BAND = { x: 82, y: 529, width: 1746, height: 371 };
+const BASELINE = 775; // where photos stand, inside the band
+const ROW_WIDTH = 1500;
+const LABEL_WIDTH = 320;
+const NAME_SIZE = 22;
+const CAPTION_SIZE = 15;
+const LABEL_HEIGHT = NAME_SIZE * 1.15 + CAPTION_SIZE * 1.15;
+
+type Placed = { item: DeckItemInfo; url: string; x: number; y: number; width: number; height: number; isBox: boolean };
+
+const isBox = (item: DeckItemInfo) => /\bbox/i.test(`${item.caption} ${item.name}`);
+
+/** Scale a photo to a target height, capping its width so wide items don't dominate. */
+function fitPhoto(size: Size, targetHeight: number, maxWidth: number) {
+  let height = targetHeight;
+  let width = (size.width / size.height) * height;
+  if (width > maxWidth) {
+    width = maxWidth;
+    height = (size.height / size.width) * width;
+  }
+  return { width, height };
 }
 
-/** The shared item layout: photo panel on the left, details on the right. */
-function itemSlide(
-  item: { code: string; name: string; image_url: string | null; productId: string | null },
-  details: (x: number, width: number) => Layer[],
+/**
+ * Lays photos out in a row standing on the band: the gift box in the middle
+ * and larger, overlapping its neighbours; everything else to either side.
+ */
+export function arrangeRow(items: { item: DeckItemInfo; url: string; size: Size }[]): Placed[] {
+  if (!items.length) return [];
+  const boxIndex = items.findIndex((i) => isBox(i.item));
+  const box = boxIndex >= 0 ? items[boxIndex] : null;
+  const others = items.filter((_, i) => i !== boxIndex);
+  const half = Math.ceil(others.length / 2);
+  const ordered = box ? [...others.slice(0, half), box, ...others.slice(half)] : others;
+
+  const sized = ordered.map((i) => {
+    const boxy = i === box;
+    return { ...i, isBox: boxy, ...fitPhoto(i.size, boxy ? 460 : 360, boxy ? 560 : 300) };
+  });
+
+  // Neighbours of the box tuck in front of it; other items get a small gap.
+  const gaps = sized.slice(1).map((s, i) => {
+    const prev = sized[i];
+    return prev.isBox || s.isBox ? -0.14 * Math.min(prev.width, s.width) : 28;
+  });
+  const total = sized.reduce((sum, s) => sum + s.width, 0) + gaps.reduce((sum, g) => sum + g, 0);
+  const k = Math.min(1, ROW_WIDTH / total);
+
+  let x = SLIDE.width / 2 - (total * k) / 2;
+  return sized.map((s, i) => {
+    const width = s.width * k;
+    const height = s.height * k;
+    const placed = { item: s.item, url: s.url, isBox: s.isBox, x, y: BASELINE - height, width, height };
+    x += width + (gaps[i] ?? 0) * k;
+    return placed;
+  });
+}
+
+const overlaps = (a: { x: number; y: number; width: number; height: number }, b: typeof a) =>
+  a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height;
+
+/** Name + caption beside each photo: left of items on the left, right of the rest, lifted clear of a taller neighbour. */
+function labels(row: Placed[]): Layer[] {
+  const boxAt = row.findIndex((p) => p.isBox);
+  const pivot = boxAt >= 0 ? boxAt : Math.floor(row.length / 2);
+
+  return row.flatMap((p, i) => {
+    const leftSide = i < pivot;
+    const box = {
+      x: leftSide ? p.x - 10 - LABEL_WIDTH : p.x + p.width + 10,
+      y: p.y + (p.isBox ? 6 : 16),
+      width: LABEL_WIDTH,
+      height: LABEL_HEIGHT,
+    };
+    const neighbour = row[leftSide ? i - 1 : i + 1];
+    if (neighbour && !p.isBox && overlaps(box, neighbour)) box.y = Math.max(40, neighbour.y - LABEL_HEIGHT - 10);
+
+    const align = leftSide ? "right" : "left";
+    const layers = [
+      text(p.item.name, box.x, box.y, { size: NAME_SIZE, color: DECK_COLORS.ink, width: LABEL_WIDTH, align, name: `${p.item.name} label` }),
+    ];
+    if (p.item.caption) {
+      layers.push(
+        text(p.item.caption, box.x, box.y + NAME_SIZE * 1.15, {
+          size: CAPTION_SIZE,
+          color: DECK_COLORS.ink,
+          width: LABEL_WIDTH,
+          align,
+          name: `${p.item.name} caption`,
+        }),
+      );
+    }
+    return layers;
+  });
+}
+
+function itemPage(
+  titleParts: [string, string],
+  price: number | null,
+  note: string,
+  logo: Photo | null,
+  middle: Layer[],
 ): HamperCanvas {
-  const X = 1090;
-  const WIDTH = 720;
-  const photo: Layer[] = item.image_url
-    ? [
-        {
-          ...base(80, 80),
-          kind: "image",
-          name: "Photo",
-          product_id: item.productId,
-          url: item.image_url,
-          width: 840,
-          height: 920,
-          fit: "contain",
-        },
-      ]
-    : [
-        text("No image yet", 80, 520, { font: "Montserrat", size: 32, color: MUTED, width: 840, align: "center", name: "No image" }),
-      ];
-
-  return page(solid(CREAM), [
-    rect(0, 0, 1000, SLIDE.height, SAND, "Photo panel"),
-    ...photo,
-    text(item.code, X, 110, { font: "Montserrat", size: 26, style: "bold", color: SAGE, width: WIDTH, spacing: 4, name: "Code" }),
-    text(item.name, X, 160, { font: "Playfair Display", size: 68, style: "bold", color: INK, width: WIDTH, name: "Name" }),
-    rect(X, 345, 120, 4, GOLD, "Rule"),
-    ...details(X, WIDTH),
-    wordmark(X, 990, WIDTH, "left", BRONZE, 22),
-  ]);
+  const [title, subtitle] = titleParts;
+  const layers: Layer[] = [
+    text(title, 86, 64, { size: 82, color: DECK_COLORS.heading, width: 1200, name: "Title" }),
+    text(subtitle, 86, 158, { size: 40, color: DECK_COLORS.heading, width: 1200, name: "Subtitle" }),
+    rect(BAND.x, BAND.y, BAND.width, BAND.height, DECK_COLORS.green, "Band"),
+    ...middle,
+  ];
+  if (price != null) {
+    layers.push(
+      text(`Price : ${formatInr(price)} + Tax`, 1213, 88, { size: 18, style: "bold", color: DECK_COLORS.heading, width: 600, align: "right", name: "Price" }),
+      text("Shipping & Packaging\nWill Cost you Extra", 1213, 112, {
+        size: 14,
+        color: DECK_COLORS.muted,
+        width: 600,
+        align: "right",
+        name: "Price note",
+      }),
+    );
+  }
+  if (logo) layers.push(logoLayer(logo, 190, "bottom-left"));
+  if (note.trim()) {
+    layers.push(text(note, 1128, 972, { size: 17, color: DECK_COLORS.muted, width: 700, align: "right", lineHeight: 1.3, name: "Terms" }));
+  }
+  return page(DECK_COLORS.page, layers);
 }
 
-const MAX_LINES = 11;
+const bandMessage = (message: string) =>
+  text(message, BAND.x, BAND.y + BAND.height / 2 - 16, { size: 28, color: DECK_COLORS.heading, width: BAND.width, align: "center", name: "Placeholder" });
 
-/** "• 2 × Walnut tray" lines, capped so a long hamper doesn't run off the slide. */
-export function contentsText(contents: { name: string; qty: number }[]): string {
-  const lines = contents.map((c) => `•  ${c.qty !== 1 ? `${c.qty} × ` : ""}${c.name}`);
-  if (lines.length <= MAX_LINES) return lines.join("\n");
-  return [...lines.slice(0, MAX_LINES - 1), `+ ${lines.length - (MAX_LINES - 1)} more`].join("\n");
+export function hamperSlide(h: HamperInfo, sizeOf: SizeOf, note: string, logo: Photo | null): HamperCanvas {
+  const seen = new Set<string>();
+  const withPhotos = h.items.flatMap((item) => {
+    const size = item.image_url ? sizeOf(item.image_url) : undefined;
+    const key = item.product_id ?? item.name;
+    if (!item.image_url || !size || seen.has(key)) return [];
+    seen.add(key);
+    return [{ item, url: item.image_url, size }];
+  });
+
+  let middle: Layer[];
+  if (withPhotos.length) {
+    const row = arrangeRow(withPhotos);
+    // The box is drawn first so the other items sit in front of it.
+    const byDepth = [...row].sort((a, b) => Number(b.isBox) - Number(a.isBox));
+    middle = [...byDepth.map((p) => photo(p.url, p, p.item.product_id, p.item.name)), ...labels(row)];
+  } else if (h.image_url && sizeOf(h.image_url)) {
+    const { width, height } = fitPhoto(sizeOf(h.image_url)!, 560, 1100);
+    middle = [photo(h.image_url, { x: SLIDE.width / 2 - width / 2, y: BASELINE - height, width, height }, null, "Hamper image")];
+  } else {
+    middle = [bandMessage("Add product photos to show this hamper's contents")];
+  }
+  return itemPage(splitTitle(h.name, "Hamper"), h.price, note, logo, middle);
 }
 
-export function hamperSlide(h: HamperInfo): HamperCanvas {
-  return itemSlide({ ...h, productId: null }, (x, width) => [
-    ...(h.price != null
-      ? [text(formatMoney(h.price), x, 385, { font: "Playfair Display", size: 60, style: "bold", color: SAGE, width, name: "Price" })]
-      : []),
-    ...(h.contents.length
-      ? [
-          text("WHAT'S INSIDE", x, 500, { font: "Montserrat", size: 24, style: "bold", color: MUTED, width, spacing: 3, name: "Contents heading" }),
-          text(contentsText(h.contents), x, 548, { font: "Inter", size: 29, color: INK, width, lineHeight: 1.5, name: "Contents" }),
-        ]
-      : []),
-  ]);
+export function productSlide(p: ProductInfo, sizeOf: SizeOf, note: string, logo: Photo | null): HamperCanvas {
+  const size = p.image_url ? sizeOf(p.image_url) : undefined;
+  let middle: Layer[];
+  if (p.image_url && size) {
+    const { width, height } = fitPhoto(size, 520, 900);
+    const placed: Placed = {
+      item: { product_id: p.id, name: p.name, caption: p.caption, image_url: p.image_url },
+      url: p.image_url,
+      isBox: false,
+      x: SLIDE.width / 2 - width / 2,
+      y: BASELINE - height,
+      width,
+      height,
+    };
+    middle = [photo(p.image_url, placed, p.id, p.name), ...labels([placed])];
+  } else {
+    middle = [bandMessage("Add a photo to this product to show it here")];
+  }
+  return itemPage([p.name, p.caption], p.price, note, logo, middle);
 }
 
-export function productSlide(p: ProductInfo): HamperCanvas {
-  return itemSlide({ ...p, productId: p.id }, (x, width) => [
-    ...(p.price != null
-      ? [text(formatMoney(p.price), x, 385, { font: "Playfair Display", size: 60, style: "bold", color: SAGE, width, name: "Price" })]
-      : []),
-    ...(p.colors.length
-      ? [
-          text("AVAILABLE IN", x, 500, { font: "Montserrat", size: 24, style: "bold", color: MUTED, width, spacing: 3, name: "Finishes heading" }),
-          text(p.colors.join("  ·  "), x, 548, { font: "Inter", size: 32, color: INK, width, name: "Finishes" }),
-        ]
-      : []),
-  ]);
-}
-
-export const blankSlide = (): HamperCanvas => page(solid(CREAM), []);
+export const blankSlide = (): HamperCanvas => page(DECK_COLORS.page, []);
 
 /* ------------------------------------------------------------ PowerPoint */
 
@@ -236,6 +400,7 @@ export function pptTextBox(l: Extract<Layer, { kind: "text" }>, height: number) 
     fontSize: Math.round(pt(l.fontSize * sy) * 10) / 10,
     bold: l.fontStyle.includes("bold"),
     italic: l.fontStyle.includes("italic"),
+    underline: l.textDecoration === "underline" ? { style: "sng" as const } : undefined,
     color,
     align: l.align,
     valign: "top" as const,

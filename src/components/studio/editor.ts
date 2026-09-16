@@ -42,6 +42,13 @@ export type Editor = {
   swapId: string | null;
   startSwap: (id: string | null) => void;
   uploadBackground: (file: File) => void;
+  /** Uploads images and adds each to the page as its own layer. */
+  uploadImages: (files: File[]) => void;
+  /** Adds an image that isn't a product photo (an upload, the logo). `at` is a page point. */
+  addImage: (url: string, name: string, at?: { x: number; y: number }) => void;
+  addLogo: () => void;
+  uploads: { url: string; name: string }[];
+  uploading: boolean;
   cutOut: (id: string, tolerance: number) => void;
   removing: boolean;
 };
@@ -90,6 +97,7 @@ export function makeText(page: HamperCanvas, text: string, s: TextStyle): Layer 
     width,
     letterSpacing: s.letterSpacing ?? 0,
     lineHeight: 1.1,
+    textDecoration: "none",
     fill: { type: "solid", color: s.color },
   };
 }

@@ -100,6 +100,21 @@ export function ImportWizard() {
     }
   }
 
+  /** Several CSVs in one go, matched to tabs by file name (e.g. "Hamper Details.csv"). */
+  async function pickMany(files: File[]) {
+    const norm = (v: string) => v.toLowerCase().replace(/[^a-z]/g, "");
+    const unmatched: string[] = [];
+    for (const file of files) {
+      const name = norm(file.name.replace(/\.csv$/i, ""));
+      const sheet = SHEETS.find((s) => name.includes(norm(s.label)) || name.includes(norm(s.key)));
+      if (sheet) await pick(sheet.key, file);
+      else unmatched.push(file.name);
+    }
+    if (unmatched.length) {
+      setParseError(`Couldn't tell which tab these are: ${unmatched.join(", ")}. Name each file after its tab, or use the pickers below.`);
+    }
+  }
+
   function run(apply: boolean) {
     startTransition(async () => {
       const result = await runImport(grids as ImportInput, apply);
@@ -133,6 +148,23 @@ export function ImportWizard() {
             accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
             className="mt-2 w-full text-sm"
             onChange={(e) => pickWorkbook(e.target.files?.[0] ?? null)}
+          />
+        </div>
+
+        <div className="mt-4 rounded-md border border-[var(--color-line)] p-3">
+          <label className="label" htmlFor="csv-many">
+            Several CSV files at once
+          </label>
+          <p className="mt-0.5 text-xs text-[var(--color-muted)]">
+            Select them together; each is matched to its tab by file name, e.g. “Product Master.csv”
+          </p>
+          <input
+            id="csv-many"
+            type="file"
+            accept=".csv,text/csv"
+            multiple
+            className="mt-2 w-full text-sm"
+            onChange={(e) => pickMany(Array.from(e.target.files ?? []))}
           />
         </div>
 

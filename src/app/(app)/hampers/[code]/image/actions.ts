@@ -76,7 +76,7 @@ export async function saveHamperCanvas(hamperId: string, formData: FormData): Pr
   }
 }
 
-// ponytail: replaced backgrounds are left in storage; clean up on save if the bucket grows.
+// ponytail: replaced backgrounds and removed uploads stay in storage; clean up on save if the bucket grows.
 export async function uploadHamperBackground(hamperId: string, formData: FormData): Promise<ActionResult> {
   try {
     const file = formData.get("file");
@@ -85,7 +85,7 @@ export async function uploadHamperBackground(hamperId: string, formData: FormDat
     if (!file.type.startsWith("image/")) return { error: "That file is not an image." };
 
     const ext = file.name.split(".").pop()?.toLowerCase() || "png";
-    const { url } = await upload(hamperId, file, `bg-${Date.now()}.${ext}`);
+    const { url } = await upload(hamperId, file, `asset-${Date.now()}-${Math.random().toString(36).slice(2, 6)}.${ext}`);
     return { ok: true, url };
   } catch (err: unknown) {
     return { error: describeError(err) };

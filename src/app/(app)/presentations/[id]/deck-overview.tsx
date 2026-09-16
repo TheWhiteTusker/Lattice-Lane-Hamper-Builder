@@ -6,6 +6,8 @@ import { PageHeader } from "@/components/ui";
 import { SlideThumb } from "@/components/studio/slide-thumb";
 import { exportPptx } from "@/components/studio/export-pptx";
 import { layerLabel } from "@/lib/hamper-canvas";
+import { DEFAULT_NOTE } from "@/lib/presentation";
+import { buildSlides } from "../build-slides";
 import {
   addSlides,
   deletePresentation,
@@ -27,7 +29,7 @@ const KIND_LABEL: Record<string, string> = {
 
 /** The slide's own name: the first text on it that isn't the wordmark or a price. */
 function slideName(s: SlideSummary) {
-  const t = s.canvas.layers.find((l) => l.kind === "text" && (l.name === "Name" || l.name === "Title"));
+  const t = s.canvas.layers.find((l) => l.kind === "text" && l.name === "Title");
   return t ? layerLabel(t) : KIND_LABEL[s.kind] ?? "Slide";
 }
 
@@ -173,7 +175,13 @@ export function DeckOverview({
               disabled={pending || !toAdd.length}
               onClick={() =>
                 run(async () => {
-                  const res = await addSlides(deck.id, toAdd);
+                  let slides;
+                  try {
+                    slides = await buildSlides(toAdd, DEFAULT_NOTE);
+                  } catch (e) {
+                    return { error: e instanceof Error ? e.message : "Could not lay out the new slides." };
+                  }
+                  const res = await addSlides(deck.id, slides);
                   if (!res.error) {
                     setToAdd([]);
                     setAdding(false);

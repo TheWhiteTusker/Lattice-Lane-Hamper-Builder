@@ -62,6 +62,7 @@ export const LayerSchema = z.discriminatedUnion("kind", [
     width: z.number().positive(),
     letterSpacing: z.number().default(0),
     lineHeight: z.number().positive().default(1),
+    textDecoration: z.enum(["none", "underline"]).default("none"),
     fill: FillSchema,
   }),
   z.object({
@@ -260,6 +261,7 @@ export function layerConfig(l: Layer, img?: ImageSize): { shape: KonvaShape; att
           width: l.width,
           letterSpacing: l.letterSpacing,
           lineHeight: l.lineHeight,
+          textDecoration: l.textDecoration === "underline" ? "underline" : "",
           ...fillProps(l.fill, l.width, l.fontSize * l.lineHeight * l.text.split("\n").length),
         },
       };

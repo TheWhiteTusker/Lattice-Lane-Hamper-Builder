@@ -13,6 +13,7 @@ export const FONTS: { family: string; google?: string }[] = [
   { family: "Montserrat", google: "Montserrat:ital,wght@0,400;0,700;1,400;1,700" },
   { family: "Poppins", google: "Poppins:ital,wght@0,400;0,700;1,400;1,700" },
   { family: "Inter", google: "Inter:ital,wght@0,400;0,700;1,400;1,700" },
+  { family: "Questrial", google: "Questrial" },
   { family: "Cabin", google: "Cabin:ital,wght@0,400;0,700;1,400;1,700" },
   { family: "Oswald", google: "Oswald:wght@400;700" },
   { family: "Bebas Neue", google: "Bebas+Neue" },

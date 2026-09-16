@@ -22,6 +22,7 @@ import {
   FlipVertical2,
   ImagePlus,
   Italic,
+  Underline,
   Lock,
   LockOpen,
   Maximize2,
@@ -258,6 +259,13 @@ function TextTools({ ed, l }: { ed: Editor; l: Extract<Layer, { kind: "text" }> 
       </ToolButton>
       <ToolButton title="Italic" active={italic} onClick={() => ed.patch(l.id, { fontStyle: style(bold, !italic) })}>
         <Italic className={icon} />
+      </ToolButton>
+      <ToolButton
+        title="Underline"
+        active={l.textDecoration === "underline"}
+        onClick={() => ed.patch(l.id, { textDecoration: l.textDecoration === "underline" ? "none" : "underline" })}
+      >
+        <Underline className={icon} />
       </ToolButton>
       <ToolButton title={`Alignment: ${l.align}`} onClick={() => ed.patch(l.id, { align: nextAlign[l.align] })}>
         <AlignIcon className={icon} />

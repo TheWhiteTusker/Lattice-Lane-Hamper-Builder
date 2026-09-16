@@ -1,16 +1,17 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { ArrowLeft, ImagePlus, Package, Palette, Search, Shapes, Trash2, Type, X } from "lucide-react";
+import { ArrowLeft, ImagePlus, Loader2, Package, Palette, Search, Shapes, Trash2, Type, Upload, X } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { CANVAS_PRESETS } from "@/lib/hamper-canvas";
 import { DRAG_MIME, SHAPES, TEXT_COMBOS, TEXT_PRESETS, makeText, type Editor, type PickerProduct } from "./editor";
 import { ColorPanel, cx, fieldCls, panelTitle, toolBtn } from "./studio-ui";
 
-export type SideTab = "products" | "text" | "elements" | "background";
+export type SideTab = "products" | "uploads" | "text" | "elements" | "background";
 
 const RAIL: { id: SideTab; label: string; Icon: typeof Package }[] = [
   { id: "products", label: "Products", Icon: Package },
+  { id: "uploads", label: "Uploads", Icon: Upload },
   { id: "text", label: "Text", Icon: Type },
   { id: "elements", label: "Elements", Icon: Shapes },
   { id: "background", label: "Background", Icon: Palette },
@@ -60,6 +61,7 @@ export function SidePanel({
       </div>
       <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-4">
         {tab === "products" && <ProductsPanel ed={ed} products={products} hamperProductIds={hamperProductIds} />}
+        {tab === "uploads" && <UploadsPanel ed={ed} />}
         {tab === "text" && <TextPanel ed={ed} />}
         {tab === "elements" && <ElementsPanel ed={ed} />}
         {tab === "background" && <BackgroundPanel ed={ed} />}
@@ -219,6 +221,61 @@ function ProductsPanel({
   );
 }
 
+function UploadsPanel({ ed }: { ed: Editor }) {
+  return (
+    <div className="space-y-3">
+      <label
+        className={cx(
+          "flex w-full cursor-pointer items-center justify-center gap-2 rounded-md bg-[var(--st-accent)] px-3 py-2.5 text-[13px] font-medium text-[var(--st-on-accent)] hover:bg-[var(--st-accent-strong)]",
+          ed.uploading && "pointer-events-none opacity-60",
+        )}
+      >
+        {ed.uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
+        {ed.uploading ? "Uploading…" : "Upload images"}
+        <input
+          type="file"
+          accept="image/*"
+          multiple
+          className="hidden"
+          onChange={(e) => {
+            const files = Array.from(e.target.files ?? []);
+            e.target.value = "";
+            ed.uploadImages(files);
+          }}
+        />
+      </label>
+      <p className="text-[12px] text-[var(--st-muted)]">
+        Pick several at once (hold Ctrl or Shift in the file dialog). Each image is added to the page as its own layer.
+      </p>
+
+      {ed.uploads.length > 0 && (
+        <>
+          <div className={panelTitle}>Uploaded this session</div>
+          <div className="grid grid-cols-2 gap-2">
+            {ed.uploads.map((u) => (
+              <button
+                key={u.url}
+                type="button"
+                title={`Add ${u.name} again`}
+                draggable
+                onDragStart={(e) => {
+                  e.dataTransfer.setData(DRAG_MIME, JSON.stringify({ product: null, url: u.url, name: u.name }));
+                  e.dataTransfer.effectAllowed = "copy";
+                }}
+                onClick={() => ed.addImage(u.url, u.name)}
+                className="checkerboard aspect-square overflow-hidden rounded-md border border-[var(--st-line)] hover:border-[var(--st-accent)]"
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={u.url} alt="" className="h-full w-full object-contain" draggable={false} />
+              </button>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
 function TextPanel({ ed }: { ed: Editor }) {
   return (
     <div className="space-y-4">
@@ -265,7 +322,20 @@ function TextPanel({ ed }: { ed: Editor }) {
 
 function ElementsPanel({ ed }: { ed: Editor }) {
   return (
-    <div>
+    <div className="space-y-4">
+      <div>
+        <div className={cx(panelTitle, "mb-2")}>Brand</div>
+        <button
+          type="button"
+          title="Add the Lattice Lane logo"
+          onClick={ed.addLogo}
+          className="flex w-full items-center justify-center rounded-md border border-[var(--st-line)] bg-white p-3 hover:border-[var(--st-accent)]"
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/brand/deck-logo.png" alt="Lattice Lane logo" className="h-16 w-auto" />
+        </button>
+      </div>
+      <div>
       <div className={cx(panelTitle, "mb-2")}>Shapes</div>
       <div className="grid grid-cols-3 gap-2">
         {SHAPES.map((s) => (
@@ -279,6 +349,7 @@ function ElementsPanel({ ed }: { ed: Editor }) {
             <svg viewBox="0 0 48 48" className="h-full w-full fill-[#c8a97e]" dangerouslySetInnerHTML={{ __html: s.svg }} />
           </button>
         ))}
+      </div>
       </div>
     </div>
   );

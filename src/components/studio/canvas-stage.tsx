@@ -53,6 +53,7 @@ import {
 } from "@/lib/hamper-canvas";
 import { removeBackground } from "@/lib/background-removal";
 import { uploadProductImage } from "@/app/(app)/products/image-actions";
+import { getBrandLogo } from "@/app/(app)/brand-actions";
 import { DRAG_MIME, baseLayer, type ActionResult, type Editor, type PickerProduct } from "./editor";
 import { ensureFontStylesheet, fontFaces, loadImage } from "./render";
 import { SlideThumb } from "./slide-thumb";
@@ -159,6 +160,8 @@ export default function CanvasStage({
   const [fontTick, setFontTick] = useState(0);
   const [clipboard, setClipboard] = useState<Layer[]>([]);
   const [resizingPage, setResizingPage] = useState(false);
+  const [uploads, setUploads] = useState<{ url: string; name: string }[]>([]);
+  const [uploading, setUploading] = useState(false);
 
   const stageRef = useRef<Konva.Stage>(null);
   const pageRef = useRef<Konva.Group>(null);
@@ -362,6 +365,67 @@ export default function CanvasStage({
     });
   };
 
+  /** A new image layer at `at` (or the page centre), scaled to fit within `share` of the page. */
+  const imageLayer = (img: HTMLImageElement, url: string, name: string, productId: string | null, at?: { x: number; y: number }, share = 0.45): Layer => {
+    const k = Math.min(1, (Math.min(W, H) * share) / Math.max(img.naturalWidth, img.naturalHeight));
+    const width = img.naturalWidth * k;
+    const height = img.naturalHeight * k;
+    const cx = at?.x ?? W / 2;
+    const cy = at?.y ?? H / 2;
+    return { ...baseLayer(cx - width / 2, cy - height / 2), kind: "image", name, product_id: productId, url, width, height, fit: "stretch" };
+  };
+
+  const addImage: Editor["addImage"] = async (url, name, at) => {
+    try {
+      add(imageLayer(await loadImage(url), url, name, null, at));
+    } catch {
+      setToast({ kind: "error", text: "That image could not be loaded." });
+    }
+  };
+
+  const addLogo = async () => {
+    const logo = await getBrandLogo();
+    if (!logo) return setToast({ kind: "error", text: "Could not load the Lattice Lane logo." });
+    try {
+      add(imageLayer(await loadImage(logo.url), logo.url, "Logo", null, undefined, 0.3));
+    } catch {
+      setToast({ kind: "error", text: "Could not load the Lattice Lane logo." });
+    }
+  };
+
+  const uploadImages: Editor["uploadImages"] = async (files) => {
+    if (!files.length) return;
+    setUploading(true);
+    const added: Layer[] = [];
+    const done: { url: string; name: string }[] = [];
+    const failed: string[] = [];
+    try {
+      for (const [i, file] of files.entries()) {
+        const fd = new FormData();
+        fd.set("file", file);
+        const res = await onUpload(fd);
+        if (res.error || !res.url) {
+          failed.push(`${file.name}: ${res.error ?? "upload failed"}`);
+          continue;
+        }
+        done.push({ url: res.url, name: file.name });
+        try {
+          // Fan the new layers out a little so they don't sit exactly on top of each other.
+          const offset = i * 40;
+          added.push(imageLayer(await loadImage(res.url), res.url, file.name, null, { x: W / 2 + offset, y: H / 2 + offset }));
+        } catch {
+          failed.push(`${file.name}: uploaded but could not be displayed`);
+        }
+      }
+    } finally {
+      setUploading(false);
+    }
+    setUploads((u) => [...done, ...u]);
+    if (added.length) addMany(added);
+    if (failed.length) setToast({ kind: "error", text: failed.join(" · ") });
+    else setToast({ kind: "ok", text: `Added ${added.length} image${added.length === 1 ? "" : "s"}.` });
+  };
+
   const placeImage: Editor["placeImage"] = async (product, url, at) => {
     try {
       const img = await loadImage(url);
@@ -378,12 +442,7 @@ export default function CanvasStage({
         select(current.id);
         return;
       }
-      const k = Math.min(1, (Math.min(W, H) * 0.45) / Math.max(img.naturalWidth, img.naturalHeight));
-      const width = img.naturalWidth * k;
-      const height = img.naturalHeight * k;
-      const cx = at?.x ?? W / 2;
-      const cy = at?.y ?? H / 2;
-      add({ ...baseLayer(cx - width / 2, cy - height / 2), kind: "image", name: product.name, product_id: product.id, url, width, height, fit: "stretch" });
+      add(imageLayer(img, url, product.name, product.id, at));
     } catch {
       setToast({ kind: "error", text: "That image could not be loaded. If it's an external link, upload it to the product instead." });
     }
@@ -474,6 +533,11 @@ export default function CanvasStage({
       if (id) setTab("products");
     },
     uploadBackground,
+    uploadImages,
+    addImage,
+    addLogo,
+    uploads,
+    uploading,
     cutOut,
     removing,
   };
@@ -964,11 +1028,12 @@ export default function CanvasStage({
               const raw = e.dataTransfer.getData(DRAG_MIME);
               if (!raw) return;
               e.preventDefault();
-              const { product, url } = JSON.parse(raw) as { product: PickerProduct; url: string };
+              const { product, url, name } = JSON.parse(raw) as { product: PickerProduct | null; url: string; name?: string };
               stageRef.current?.setPointersPositions(e.nativeEvent);
               const at = pageRef.current?.getRelativePointerPosition() ?? undefined;
               setSwapId(null);
-              placeImage(product, url, at);
+              if (product) placeImage(product, url, at);
+              else addImage(url, name ?? "Image", at);
             }}
           >
             {board.w > 0 && (

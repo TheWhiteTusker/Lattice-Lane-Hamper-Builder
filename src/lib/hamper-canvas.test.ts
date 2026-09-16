@@ -55,7 +55,7 @@ test("parseCanvas round-trips a valid document and falls back on junk", () => {
   const doc = emptyCanvas();
   doc.layers.push(
     {
-      id: "t1", visible: true, locked: false, letterSpacing: 0, lineHeight: 1, kind: "text", x: 1, y: 2, rotation: 15, scaleX: 1, scaleY: 1, opacity: 1,
+      id: "t1", visible: true, locked: false, letterSpacing: 0, lineHeight: 1, textDecoration: "none", kind: "text", x: 1, y: 2, rotation: 15, scaleX: 1, scaleY: 1, opacity: 1,
       text: "Hi", fontSize: 40, fontFamily: "Arial", fontStyle: "bold", align: "center", width: 300,
       fill: { type: "linear", from: "#111111", to: "#eeeeee", angle: 45 },
     },

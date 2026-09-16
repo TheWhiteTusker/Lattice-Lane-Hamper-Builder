@@ -8,7 +8,7 @@ export default async function NewPresentationPage() {
   const { supabase } = await requireUser();
   const [picker, settings] = await Promise.all([loadPickerData(supabase), loadSettings(supabase)]);
   const c = settings.company;
-  const contact = [c.phone, c.email, c.website].filter(Boolean).join("\n");
+  const contact = [c.phone, c.address].filter(Boolean).join("\n");
 
   return (
     <>
