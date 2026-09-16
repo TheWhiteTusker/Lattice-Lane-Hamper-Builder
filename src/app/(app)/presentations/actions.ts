@@ -6,7 +6,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { describeError } from "@/lib/forms";
 import { CanvasSchema } from "@/lib/hamper-canvas";
-import { blankSlide, type DeckItemInfo, type HamperInfo, type Photo, type ProductInfo } from "@/lib/presentation";
+import { type DeckItemInfo, type HamperInfo, type Photo, type ProductInfo } from "@/lib/presentation";
 import type { ActionResult } from "@/components/studio/editor";
 import { getBrandLogo } from "../brand-actions";
 
@@ -173,104 +173,100 @@ export async function createPresentation(input: { title: string; slides: SlideIn
   redirect(`/presentations/${deck.id}`);
 }
 
-async function lastPosition(supabase: Supabase, presentationId: string) {
-  const { data } = await supabase
-    .from("presentation_slides")
-    .select("position")
-    .eq("presentation_id", presentationId)
-    .order("position", { ascending: false })
-    .limit(1)
-    .maybeSingle<{ position: number }>();
-  return data?.position ?? -1;
-}
-
-/** Appends slides before the closing slide, if the deck still ends with one. */
-export async function addSlides(presentationId: string, input: SlideInput[] | "blank"): Promise<ActionResult> {
-  try {
-    const parsed = z
-      .array(SlideSchema)
-      .safeParse(input === "blank" ? [{ kind: "blank", hamper_id: null, product_id: null, canvas: blankSlide() }] : input);
-    if (!parsed.success) return { error: "Could not read the new slides." };
-    const rows = parsed.data;
-    if (!rows.length) return { error: "Nothing to add." };
-
-    const supabase = await createClient();
-    const { data: ordered } = await supabase
-      .from("presentation_slides")
-      .select("id, kind, position")
-      .eq("presentation_id", presentationId)
-      .order("position")
-      .returns<{ id: string; kind: string; position: number }[]>();
-    const closing = ordered?.at(-1)?.kind === "closing" ? ordered.at(-1)! : null;
-    const start = closing ? closing.position : (await lastPosition(supabase, presentationId)) + 1;
-
-    const { error } = await supabase
-      .from("presentation_slides")
-      .insert(rows.map((s, i) => ({ ...s, presentation_id: presentationId, position: start + i })));
-    if (error) return { error: describeError(error) };
-    if (closing) {
-      await supabase.from("presentation_slides").update({ position: start + rows.length }).eq("id", closing.id);
-    }
-    await touch(supabase, presentationId);
-    revalidatePath(`/presentations/${presentationId}`);
-    return { ok: true };
-  } catch (err) {
-    return { error: describeError(err) };
-  }
-}
-
 async function touch(supabase: Supabase, presentationId: string) {
   // The trigger sets updated_at; any update fires it.
   await supabase.from("presentations").update({ updated_at: new Date().toISOString() }).eq("id", presentationId);
 }
 
-export async function moveSlide(presentationId: string, slideId: string, by: -1 | 1): Promise<ActionResult> {
-  const supabase = await createClient();
-  const { data } = await supabase
-    .from("presentation_slides")
-    .select("id, position")
-    .eq("presentation_id", presentationId)
-    .order("position")
-    .returns<{ id: string; position: number }[]>();
-  const rows = data ?? [];
-  const ids = rows.map((s) => s.id);
-  const from = ids.indexOf(slideId);
-  const to = from + by;
-  if (from < 0 || to < 0 || to >= ids.length) return { ok: true };
-  [ids[from], ids[to]] = [ids[to], ids[from]];
+/* ------------------------------------------------------------ deck save */
 
-  // Renumber 0..n so positions stay tidy after deletes.
-  const results = await Promise.all(
-    ids.map((id, position) =>
-      rows.find((s) => s.id === id)?.position === position
-        ? null
-        : supabase.from("presentation_slides").update({ position }).eq("id", id),
-    ),
-  );
-  const failed = results.find((r) => r?.error);
-  if (failed?.error) return { error: describeError(failed.error) };
-  revalidatePath(`/presentations/${presentationId}`);
-  return { ok: true };
-}
+/** An existing slide is sent by id; a slide added on the page since the last save is sent in full. */
+const DeckSlideSchema = z.union([
+  z.object({ id: z.string().uuid() }).strict(),
+  SlideSchema.extend({ tempId: z.string().min(1) }),
+]);
+export type DeckSlideInput = z.input<typeof DeckSlideSchema>;
 
-export async function deleteSlide(presentationId: string, slideId: string): Promise<ActionResult> {
-  const supabase = await createClient();
-  const { error } = await supabase.from("presentation_slides").delete().eq("id", slideId).eq("presentation_id", presentationId);
-  if (error) return { error: describeError(error) };
-  await touch(supabase, presentationId);
-  revalidatePath(`/presentations/${presentationId}`);
-  return { ok: true };
-}
+const DeckSaveSchema = z.object({
+  title: z.string().trim().min(1, "The title can't be empty."),
+  slides: z.array(DeckSlideSchema),
+});
 
-export async function renamePresentation(presentationId: string, title: string): Promise<ActionResult> {
-  const clean = title.trim();
-  if (!clean) return { error: "The title can't be empty." };
-  const supabase = await createClient();
-  const { error } = await supabase.from("presentations").update({ title: clean }).eq("id", presentationId);
-  if (error) return { error: describeError(error) };
-  revalidatePath("/presentations");
-  revalidatePath(`/presentations/${presentationId}`);
-  return { ok: true };
+/**
+ * Saves the deck page's draft in one go: the title, which slides remain,
+ * their order, and any slides added. Returns the database ids given to the
+ * added slides, keyed by their temporary ids.
+ *
+ * ponytail: several statements, not one transaction; move into an RPC if
+ * two people editing the same deck at once becomes a real case.
+ */
+export async function saveDeck(
+  presentationId: string,
+  input: { title: string; slides: DeckSlideInput[] },
+): Promise<ActionResult & { ids?: Record<string, string> }> {
+  const parsed = DeckSaveSchema.safeParse(input);
+  if (!parsed.success) return { error: parsed.error.issues[0].message };
+  const { title, slides } = parsed.data;
+
+  try {
+    const supabase = await createClient();
+    const { data: existing, error: loadError } = await supabase
+      .from("presentation_slides")
+      .select("id, position")
+      .eq("presentation_id", presentationId)
+      .returns<{ id: string; position: number }[]>();
+    if (loadError) return { error: describeError(loadError) };
+
+    const current = new Map((existing ?? []).map((r) => [r.id, r.position]));
+    const kept = slides.flatMap((s) => ("id" in s ? [s.id] : []));
+    if (kept.some((id) => !current.has(id))) {
+      return { error: "Some slides were changed somewhere else. Reload the page and make your changes again." };
+    }
+
+    const removed = [...current.keys()].filter((id) => !kept.includes(id));
+    if (removed.length) {
+      const { error } = await supabase.from("presentation_slides").delete().in("id", removed);
+      if (error) return { error: describeError(error) };
+    }
+
+    const added = slides.flatMap((s, position) => ("tempId" in s ? [{ s, position }] : []));
+    const ids: Record<string, string> = {};
+    if (added.length) {
+      const { data: inserted, error } = await supabase
+        .from("presentation_slides")
+        .insert(
+          added.map(({ s, position }) => ({
+            presentation_id: presentationId,
+            position,
+            kind: s.kind,
+            hamper_id: s.hamper_id,
+            product_id: s.product_id,
+            canvas: s.canvas,
+          })),
+        )
+        .select("id, position")
+        .returns<{ id: string; position: number }[]>();
+      if (error || !inserted) return { error: describeError(error) };
+      for (const row of inserted) {
+        const match = added.find((a) => a.position === row.position);
+        if (match) ids[match.s.tempId] = row.id;
+      }
+    }
+
+    const moves = slides.flatMap((s, position) => ("id" in s && current.get(s.id) !== position ? [{ id: s.id, position }] : []));
+    const results = await Promise.all(
+      moves.map((m) => supabase.from("presentation_slides").update({ position: m.position }).eq("id", m.id)),
+    );
+    const failed = results.find((r) => r.error);
+    if (failed?.error) return { error: describeError(failed.error) };
+
+    const { error: titleError } = await supabase.from("presentations").update({ title }).eq("id", presentationId);
+    if (titleError) return { error: describeError(titleError) };
+
+    return { ok: true, ids };
+  } catch (err) {
+    return { error: describeError(err) };
+  }
 }
 
 export async function deletePresentation(presentationId: string): Promise<ActionResult> {
@@ -311,7 +307,6 @@ export async function saveSlide(presentationId: string, slideId: string, formDat
     if (error || !data?.length) return { error: error ? describeError(error) : "This slide no longer exists." };
 
     await touch(supabase, presentationId);
-    revalidatePath(`/presentations/${presentationId}`, "layout");
     return { ok: true };
   } catch (err) {
     return { error: describeError(err) };
