@@ -293,7 +293,10 @@ export function PickListManager({ settings }: { settings: Settings }) {
                           {config.label} ({count} {count === 1 ? "value" : "values"})
                         </span>
                         {isSelected && (
-                          <Check className="h-4 w-4 shrink-0 text-[var(--color-brand)] group-hover:text-white group-focus:text-white" />
+                          <Check
+                            strokeWidth={3.2}
+                            className="h-4.5 w-4.5 shrink-0 text-[var(--color-brand)] group-hover:text-white group-focus:text-white"
+                          />
                         )}
                       </button>
                     );
