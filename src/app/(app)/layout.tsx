@@ -6,7 +6,8 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
   return (
     <>
-      <Nav profile={profile} />
+      {/* LATTICE_DESKTOP is set by electron/main.cjs: no download button inside the app itself. */}
+      <Nav profile={profile} desktop={process.env.LATTICE_DESKTOP === "1"} />
       <main id="top" className="mx-auto w-full max-w-[1400px] flex-1 px-4 py-6">
         {children}
       </main>

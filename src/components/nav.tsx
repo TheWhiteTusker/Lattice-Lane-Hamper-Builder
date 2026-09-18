@@ -12,7 +12,7 @@ const ROLE_LABEL: Record<Profile["role"], string> = {
   sales: "Sales",
 };
 
-export function Nav({ profile }: { profile: Profile }) {
+export function Nav({ profile, desktop }: { profile: Profile; desktop: boolean }) {
   const pathname = usePathname();
   const router = useRouter();
 
@@ -40,7 +40,7 @@ export function Nav({ profile }: { profile: Profile }) {
   // bar behind it — same pairing the storefront uses.
   return (
     <header className="no-print bg-[var(--color-brand)]">
-      <div className="mx-auto flex max-w-[1400px] flex-wrap items-center gap-x-6 gap-y-2 px-4 py-3">
+      <div className="flex items-center gap-6 whitespace-nowrap px-6 py-3">
         <Link href="/" aria-label="Lattice Lane — dashboard" className="shrink-0">
           <Image
             src="/lattice-lane-logo.png"
@@ -52,13 +52,13 @@ export function Nav({ profile }: { profile: Profile }) {
           />
         </Link>
 
-        <nav className="flex flex-1 flex-wrap items-center gap-1">
+        <nav className="flex min-w-0 flex-1 items-center gap-1 overflow-x-auto">
           {links.map((link) => (
             <Link
               key={link.href}
               href={link.href}
               aria-current={isActive(link.href) ? "page" : undefined}
-              className={`rounded-full px-3 py-1.5 text-sm transition-colors ${
+              className={`shrink-0 rounded-full px-3 py-1.5 text-sm transition-colors ${
                 isActive(link.href)
                   ? "bg-[var(--color-paper)] font-medium text-[var(--color-brand-dark)]"
                   : "text-white/75 hover:bg-white/10 hover:text-white"
@@ -69,7 +69,16 @@ export function Nav({ profile }: { profile: Profile }) {
           ))}
         </nav>
 
-        <div className="flex items-center gap-3 text-sm">
+        <div className="flex shrink-0 items-center gap-3 text-sm">
+          {!desktop && (
+            // Plain <a>: a file download, not a page for the router to prefetch.
+            <a
+              href="/download"
+              className="btn rounded-full border border-white/30 text-white hover:bg-white/10"
+            >
+              Download app
+            </a>
+          )}
           <span className="text-white/75">
             {profile.full_name || "Account"}
             <span className="ml-2 rounded-full border border-white/25 bg-white/10 px-2 py-0.5 text-[11px] font-medium text-white">

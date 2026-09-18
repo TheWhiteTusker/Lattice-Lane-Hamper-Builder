@@ -1,24 +1,86 @@
-const { app, BrowserWindow, shell, session, Menu } = require("electron");
+const { app, BrowserWindow, shell, utilityProcess } = require("electron");
 const path = require("path");
+const http = require("http");
+const net = require("net");
 const fs = require("fs");
 
-const DEFAULT_URL = "https://lattice-lane-hamper-builder.digital-9f6.workers.dev";
-const TARGET_URL = process.env.LATTICE_LANE_URL || DEFAULT_URL;
-
+// The app runs its own Next server on localhost and talks to the same Supabase
+// project as the website, so the data is identical but no click waits on the
+// Cloudflare Worker (~1.5s per page when measured).
 let mainWindow = null;
+let server = null;
+let appUrl = null;
+
+const page = (title, body) =>
+  "data:text/html;charset=utf-8," +
+  encodeURIComponent(`<!DOCTYPE html><html><head><title>${title}</title><style>
+    body{font-family:"Segoe UI",sans-serif;display:flex;align-items:center;justify-content:center;
+      height:100vh;margin:0;background:#faf9f6;color:#2c332d}
+    .card{background:#fff;padding:40px;border-radius:12px;box-shadow:0 4px 20px rgba(0,0,0,.06);
+      text-align:center;max-width:420px}
+    h2{margin-top:0;color:#54655b} p{color:#666;font-size:14px;line-height:1.5}
+    button{background:#54655b;color:#fff;border:0;padding:10px 24px;font-size:14px;font-weight:600;
+      border-radius:6px;cursor:pointer;margin-top:16px}
+  </style></head><body><div class="card">${body}</div></body></html>`);
+
+function freePort() {
+  return new Promise((resolve, reject) => {
+    const s = net.createServer();
+    s.listen(0, "127.0.0.1", () => {
+      const { port } = s.address();
+      s.close(() => resolve(port));
+    });
+    s.on("error", reject);
+  });
+}
+
+function waitForServer(url, timeoutMs = 30000) {
+  const start = Date.now();
+  return new Promise((resolve, reject) => {
+    const attempt = () =>
+      http
+        .get(url, (res) => {
+          res.resume();
+          resolve();
+        })
+        .on("error", () => {
+          if (Date.now() - start > timeoutMs) reject(new Error("Local server did not start"));
+          else setTimeout(attempt, 100);
+        });
+    attempt();
+  });
+}
+
+function serverScript() {
+  const packaged = path.join(process.resourcesPath, "standalone", "server.js");
+  if (fs.existsSync(packaged)) return packaged;
+  return path.join(__dirname, "..", ".next", "standalone", "server.js");
+}
+
+async function startServer() {
+  const port = await freePort();
+  const script = serverScript();
+  server = utilityProcess.fork(script, [], {
+    cwd: path.dirname(script),
+    env: { ...process.env, LATTICE_DESKTOP: "1", PORT: String(port), HOSTNAME: "127.0.0.1", NODE_ENV: "production" },
+  });
+  server.on("exit", () => {
+    server = null;
+    if (!app.isQuitting) app.quit();
+  });
+  appUrl = `http://127.0.0.1:${port}`;
+  await waitForServer(appUrl);
+}
 
 function createWindow() {
-  const iconPath = fs.existsSync(path.join(__dirname, "..", "build", "icon.ico"))
-    ? path.join(__dirname, "..", "build", "icon.ico")
-    : path.join(__dirname, "..", "src", "app", "icon.png");
-
+  const ico = path.join(__dirname, "..", "build", "icon.ico");
   mainWindow = new BrowserWindow({
     width: 1440,
     height: 900,
     minWidth: 1024,
     minHeight: 700,
     title: "Lattice Lane - Hamper Builder",
-    icon: iconPath,
+    icon: fs.existsSync(ico) ? ico : path.join(__dirname, "..", "src", "app", "icon.png"),
     autoHideMenuBar: true,
     webPreferences: {
       preload: path.join(__dirname, "preload.cjs"),
@@ -28,102 +90,56 @@ function createWindow() {
     },
   });
 
-  // External links open in default web browser
+  // Anything that isn't the app itself opens in the default browser.
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
-    if (!url.startsWith(TARGET_URL) && !url.includes("supabase.co")) {
-      shell.openExternal(url);
-      return { action: "deny" };
-    }
-    return { action: "allow" };
+    if (appUrl && url.startsWith(appUrl)) return { action: "allow" };
+    shell.openExternal(url);
+    return { action: "deny" };
   });
 
-  // Load the live cloud app
-  mainWindow.loadURL(TARGET_URL);
-
-  // Friendly retry page if offline or connection drops
-  mainWindow.webContents.on("did-fail-load", (event, errorCode, errorDescription, validatedURL) => {
-    if (errorCode === -3) return; // Ignore user abort / redirects
-
-    mainWindow.loadURL(`data:text/html;charset=utf-8,
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <title>Lattice Lane - Offline</title>
-          <style>
-            body {
-              font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-              display: flex;
-              flex-direction: column;
-              align-items: center;
-              justify-content: center;
-              height: 100vh;
-              margin: 0;
-              background-color: #faf9f6;
-              color: #2c332d;
-            }
-            .card {
-              background: white;
-              padding: 40px;
-              border-radius: 12px;
-              box-shadow: 0 4px 20px rgba(0,0,0,0.06);
-              text-align: center;
-              max-width: 420px;
-            }
-            h2 { margin-top: 0; color: #54655b; }
-            p { color: #666; font-size: 14px; line-height: 1.5; }
-            button {
-              background: #54655b;
-              color: white;
-              border: none;
-              padding: 10px 24px;
-              font-size: 14px;
-              font-weight: 600;
-              border-radius: 6px;
-              cursor: pointer;
-              margin-top: 16px;
-            }
-            button:hover { background: #44534a; }
-          </style>
-        </head>
-        <body>
-          <div class="card">
-            <h2>Connection Unavailable</h2>
-            <p>Could not connect to Lattice Lane. Please check your internet connection and try again.</p>
-            <button onclick="window.location.href='${TARGET_URL}'">Retry Connection</button>
-          </div>
-        </body>
-      </html>
-    `);
+  mainWindow.webContents.on("did-fail-load", (_e, code, _desc, url) => {
+    if (code === -3 || !url.startsWith("http")) return; // aborted / redirected
+    mainWindow.loadURL(
+      page(
+        "Lattice Lane - Offline",
+        `<h2>Connection Unavailable</h2>
+         <p>Could not reach the Lattice Lane database. Check your internet connection and try again.</p>
+         <button onclick="location.href='${url}'">Retry</button>`,
+      ),
+    );
   });
 
   mainWindow.on("closed", () => {
     mainWindow = null;
   });
+
+  // Show something at once; the local server takes a moment on first launch.
+  mainWindow.loadURL(page("Lattice Lane", "<h2>Lattice Lane</h2><p>Starting…</p>"));
 }
 
-// Ensure single instance running
-const gotTheLock = app.requestSingleInstanceLock();
-if (!gotTheLock) {
+if (!app.requestSingleInstanceLock()) {
   app.quit();
 } else {
   app.on("second-instance", () => {
-    if (mainWindow) {
-      if (mainWindow.isMinimized()) mainWindow.restore();
-      mainWindow.focus();
+    if (!mainWindow) return;
+    if (mainWindow.isMinimized()) mainWindow.restore();
+    mainWindow.focus();
+  });
+
+  app.whenReady().then(async () => {
+    createWindow();
+    try {
+      await startServer();
+      mainWindow?.loadURL(appUrl);
+    } catch (error) {
+      mainWindow?.loadURL(page("Lattice Lane - Error", `<h2>Could not start</h2><p>${error.message}</p>`));
     }
   });
 
-  app.whenReady().then(createWindow);
-
-  app.on("window-all-closed", () => {
-    if (process.platform !== "darwin") {
-      app.quit();
-    }
+  app.on("before-quit", () => {
+    app.isQuitting = true;
+    server?.kill();
   });
 
-  app.on("activate", () => {
-    if (BrowserWindow.getAllWindows().length === 0) {
-      createWindow();
-    }
-  });
+  app.on("window-all-closed", () => app.quit());
 }

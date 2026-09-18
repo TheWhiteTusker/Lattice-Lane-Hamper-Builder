@@ -3,8 +3,9 @@ import fs from "node:fs";
 import path from "node:path";
 
 const ROOT = path.resolve(import.meta.dirname, "..");
+const STANDALONE = path.join(ROOT, ".next", "standalone");
 
-console.log("\n=== [1/2] Ensuring build/icon.ico exists ===");
+console.log("\n=== [1/4] Ensuring build/icon.ico exists ===");
 const iconIco = path.join(ROOT, "build", "icon.ico");
 if (!fs.existsSync(iconIco)) {
   fs.mkdirSync(path.join(ROOT, "build"), { recursive: true });
@@ -15,9 +16,23 @@ if (!fs.existsSync(iconIco)) {
 }
 console.log("✓ Icon verified");
 
-console.log("\n=== [2/2] Packaging Windows Executable with electron-builder ===");
-execSync("pnpm exec electron-builder --win", {
+console.log("\n=== [2/4] Building Next.js in standalone mode ===");
+fs.rmSync(STANDALONE, { recursive: true, force: true });
+execSync("pnpm run build", {
   cwd: ROOT,
   stdio: "inherit",
+  env: { ...process.env, BUILD_STANDALONE: "true" },
 });
-console.log("\n✨ Windows executable packaging complete! Check the dist/ folder.");
+
+console.log("\n=== [3/4] Copying static assets into the standalone server ===");
+fs.cpSync(path.join(ROOT, "public"), path.join(STANDALONE, "public"), { recursive: true });
+fs.cpSync(path.join(ROOT, ".next", "static"), path.join(STANDALONE, ".next", "static"), { recursive: true });
+// Only the public anon key ships. Next may have traced .env (local overrides,
+// possibly secrets) into the bundle, so remove it.
+fs.copyFileSync(path.join(ROOT, ".env.production"), path.join(STANDALONE, ".env.production"));
+fs.rmSync(path.join(STANDALONE, ".env"), { force: true });
+console.log("✓ Standalone server ready");
+
+console.log("\n=== [4/4] Packaging Windows installer with electron-builder ===");
+execSync("pnpm exec electron-builder --win", { cwd: ROOT, stdio: "inherit" });
+console.log("\n✨ Done. Installer is in dist/.");

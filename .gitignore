@@ -49,7 +49,9 @@ next-env.d.ts
 
 # Skill symlinks point at absolute local paths, so they are per-machine.
 # The skills themselves live in .agents/ and are committed.
-.claude/
+.claude/*
+# Shared project settings (plugins such as ponytail) are committed.
+!.claude/settings.json
 
 # Cloudflare Workers build output
 .open-next/

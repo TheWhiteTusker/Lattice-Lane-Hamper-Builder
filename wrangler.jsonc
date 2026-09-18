@@ -17,6 +17,12 @@
     "binding": "ASSETS"
   },
 
+  // The Windows installer, served by /download. Too big (117 MB) for static
+  // assets, which cap at 25 MiB. Upload with `pnpm publish:desktop`.
+  "r2_buckets": [
+    { "binding": "DOWNLOADS", "bucket_name": "lattice-lane-downloads" }
+  ],
+
   "observability": {
     "enabled": true
   }
