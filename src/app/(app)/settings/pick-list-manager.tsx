@@ -269,7 +269,7 @@ export function PickListManager({ settings }: { settings: Settings }) {
                 <div
                   role="listbox"
                   aria-labelledby="picklist-label"
-                  className="absolute left-0 top-full z-40 mt-1 max-h-72 w-full overflow-y-auto rounded-lg border border-[var(--color-line)] bg-white py-1 shadow-lg animate-in fade-in zoom-in-95 duration-100"
+                  className="absolute left-0 top-full z-40 mt-1 max-h-72 w-full overflow-y-auto rounded-lg border border-[var(--color-line)] bg-white py-1 shadow-lg"
                 >
                   {PICK_LIST_CONFIGS.map((config) => {
                     const count = (lists[config.key] ?? []).length;
@@ -285,7 +285,7 @@ export function PickListManager({ settings }: { settings: Settings }) {
                           setSearch("");
                           setIsDropdownOpen(false);
                         }}
-                        className={`flex w-full items-center justify-between px-3 py-2 text-left text-sm font-medium transition-colors cursor-pointer ${
+                        className={`flex w-full select-none items-center justify-between px-3 py-2 text-left text-sm font-medium cursor-pointer ${
                           isSelected
                             ? "bg-[var(--color-brand)] text-white"
                             : "text-[var(--color-ink)] hover:bg-[var(--color-brand)] hover:text-white"
