@@ -191,3 +191,35 @@ test("layerConfig: contain fits and centres the photo inside its frame", () => {
     width: 1000, height: 1000, x: 0, y: -250,
   });
 });
+
+test("layerConfig and parseCanvas: line and curve layers", () => {
+  const base = { id: "l1", visible: true, locked: false, x: 50, y: 60, rotation: 0, scaleX: 1, scaleY: 1, opacity: 1 };
+  const lineDoc = {
+    width: 1080,
+    height: 1080,
+    background: { fill: { type: "solid", color: "#ffffff" }, image_url: null },
+    layers: [
+      { ...base, kind: "line", points: [0, 0, 200, 100], stroke: "#2c332f", strokeWidth: 4, lineCap: "round" },
+      { ...base, id: "c1", kind: "curve", points: [0, 0, 100, -50, 200, 0], curvature: 0.5, stroke: "#54655b", strokeWidth: 6, lineCap: "round" },
+    ],
+  };
+
+  const parsed = parseCanvas(lineDoc);
+  assert.equal(parsed.layers.length, 2);
+  assert.equal(parsed.layers[0].kind, "line");
+  assert.equal(parsed.layers[1].kind, "curve");
+
+  const lineCfg = layerConfig(parsed.layers[0]);
+  assert.equal(lineCfg.shape, "Line");
+  assert.equal(lineCfg.attrs.stroke, "#2c332f");
+  assert.equal(lineCfg.attrs.strokeWidth, 4);
+  assert.deepEqual(lineCfg.attrs.points, [0, 0, 200, 100]);
+
+  const curveCfg = layerConfig(parsed.layers[1]);
+  assert.equal(curveCfg.shape, "Line");
+  assert.equal(curveCfg.attrs.stroke, "#54655b");
+  assert.equal(curveCfg.attrs.strokeWidth, 6);
+  assert.equal(curveCfg.attrs.bezier, true);
+  assert.deepEqual(curveCfg.attrs.points, [0, 0, 100, -50, 200, 0]);
+});
+

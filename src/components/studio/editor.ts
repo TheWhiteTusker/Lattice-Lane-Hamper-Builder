@@ -51,6 +51,8 @@ export type Editor = {
   uploading: boolean;
   cutOut: (id: string, tolerance: number) => void;
   removing: boolean;
+  activeTool: "select" | "line" | "curve";
+  setActiveTool: (tool: "select" | "line" | "curve") => void;
 };
 
 export const DRAG_MIME = "application/x-hamper-image";
@@ -150,4 +152,43 @@ export const SHAPES: { label: string; svg: string; make: (page: HamperCanvas) =>
     svg: '<polygon points="24,2 28,15 40,8 33,20 46,24 33,28 40,40 28,33 24,46 20,33 8,40 15,28 2,24 15,20 8,8 20,15"/>',
     make: (p) => ({ ...baseLayer(p.width / 2, p.height / 2), ...style, kind: "star", numPoints: 12, innerRadius: 130, outerRadius: 170 }),
   },
+  {
+    label: "Line",
+    svg: '<line x1="6" y1="24" x2="42" y2="24" stroke="currentColor" stroke-width="4" stroke-linecap="round"/>',
+    make: (p) => ({
+      ...baseLayer(p.width / 2 - 200, p.height / 2),
+      kind: "line",
+      points: [0, 0, 400, 0],
+      stroke: "#2c332f",
+      strokeWidth: 4,
+      lineCap: "round",
+    }),
+  },
+  {
+    label: "Curved line",
+    svg: '<path d="M6 34 Q24 10 42 34" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round"/>',
+    make: (p) => ({
+      ...baseLayer(p.width / 2 - 200, p.height / 2),
+      kind: "curve",
+      points: [0, 0, 200, -120, 400, 0],
+      curvature: 0.5,
+      stroke: "#2c332f",
+      strokeWidth: 4,
+      lineCap: "round",
+    }),
+  },
+  {
+    label: "Dashed line",
+    svg: '<line x1="6" y1="24" x2="42" y2="24" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-dasharray="6,4"/>',
+    make: (p) => ({
+      ...baseLayer(p.width / 2 - 200, p.height / 2),
+      kind: "line",
+      points: [0, 0, 400, 0],
+      stroke: "#2c332f",
+      strokeWidth: 4,
+      lineCap: "round",
+      dash: [16, 12],
+    }),
+  },
 ];
+

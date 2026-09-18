@@ -20,6 +20,15 @@ function baseSize(l: Layer) {
       return { w: l.radius * 2, h: l.radius * 2 };
     case "star":
       return { w: l.outerRadius * 2, h: l.outerRadius * 2 };
+    case "line":
+    case "curve": {
+      const xs = l.points.filter((_, i) => i % 2 === 0);
+      const ys = l.points.filter((_, i) => i % 2 === 1);
+      return {
+        w: Math.max(20, Math.max(...xs) - Math.min(...xs)),
+        h: Math.max(20, Math.max(...ys) - Math.min(...ys)),
+      };
+    }
   }
 }
 
@@ -37,6 +46,19 @@ function Thumb({ l }: { l: Layer }) {
     return (
       <span className={cx(box, "bg-[var(--st-panel-2)] text-[15px] font-semibold")} style={{ fontFamily: l.fontFamily }}>
         T
+      </span>
+    );
+  }
+  if (l.kind === "line" || l.kind === "curve") {
+    return (
+      <span className={cx(box, "bg-[var(--st-panel-2)]")}>
+        <svg viewBox="0 0 24 24" className="h-5 w-5" stroke={l.stroke} strokeWidth="2.5" fill="none" strokeLinecap="round">
+          {l.kind === "line" ? (
+            <line x1="4" y1="20" x2="20" y2="4" strokeDasharray={l.dash?.length ? "4 3" : undefined} />
+          ) : (
+            <path d="M4 18 C8 6, 16 6, 20 18" strokeDasharray={l.dash?.length ? "4 3" : undefined} />
+          )}
+        </svg>
       </span>
     );
   }

@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { ArrowLeft, ImagePlus, Loader2, Package, Palette, Search, Shapes, Trash2, Type, Upload, X } from "lucide-react";
+import { ArrowLeft, ImagePlus, Loader2, Package, Palette, Search, Shapes, Slash, Spline, Trash2, Type, Upload, X } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { CANVAS_PRESETS } from "@/lib/hamper-canvas";
 import { DRAG_MIME, SHAPES, TEXT_COMBOS, TEXT_PRESETS, makeText, type Editor, type PickerProduct } from "./editor";
@@ -336,20 +336,53 @@ function ElementsPanel({ ed }: { ed: Editor }) {
         </button>
       </div>
       <div>
-      <div className={cx(panelTitle, "mb-2")}>Shapes</div>
-      <div className="grid grid-cols-3 gap-2">
-        {SHAPES.map((s) => (
+        <div className={cx(panelTitle, "mb-2")}>Draw (MS Paint style)</div>
+        <div className="grid grid-cols-2 gap-2">
           <button
-            key={s.label}
             type="button"
-            title={s.label}
-            onClick={() => ed.add(s.make(ed.canvas))}
-            className="flex aspect-square items-center justify-center rounded-md bg-[var(--st-panel-2)] p-3 hover:bg-[var(--st-hover)]"
+            title="Draw straight line by dragging on canvas"
+            onClick={() => ed.setActiveTool(ed.activeTool === "line" ? "select" : "line")}
+            className={cx(
+              "flex items-center gap-2 rounded-md border p-2.5 text-[12px] font-medium transition-colors",
+              ed.activeTool === "line"
+                ? "border-[var(--st-accent)] bg-[var(--st-accent-soft)] text-[var(--st-accent-strong)]"
+                : "border-[var(--st-line)] bg-[var(--st-panel-2)] hover:bg-[var(--st-hover)]",
+            )}
           >
-            <svg viewBox="0 0 48 48" className="h-full w-full fill-[#c8a97e]" dangerouslySetInnerHTML={{ __html: s.svg }} />
+            <Slash className="h-4 w-4 shrink-0 rotate-45" />
+            <span>Draw Line</span>
           </button>
-        ))}
+          <button
+            type="button"
+            title="Draw curved line by dragging on canvas"
+            onClick={() => ed.setActiveTool(ed.activeTool === "curve" ? "select" : "curve")}
+            className={cx(
+              "flex items-center gap-2 rounded-md border p-2.5 text-[12px] font-medium transition-colors",
+              ed.activeTool === "curve"
+                ? "border-[var(--st-accent)] bg-[var(--st-accent-soft)] text-[var(--st-accent-strong)]"
+                : "border-[var(--st-line)] bg-[var(--st-panel-2)] hover:bg-[var(--st-hover)]",
+            )}
+          >
+            <Spline className="h-4 w-4 shrink-0" />
+            <span>Draw Curve</span>
+          </button>
+        </div>
       </div>
+      <div>
+        <div className={cx(panelTitle, "mb-2")}>Shapes</div>
+        <div className="grid grid-cols-3 gap-2">
+          {SHAPES.map((s) => (
+            <button
+              key={s.label}
+              type="button"
+              title={s.label}
+              onClick={() => ed.add(s.make(ed.canvas))}
+              className="flex aspect-square items-center justify-center rounded-md bg-[var(--st-panel-2)] p-3 hover:bg-[var(--st-hover)]"
+            >
+              <svg viewBox="0 0 48 48" className="h-full w-full fill-[#c8a97e] stroke-[#c8a97e]" dangerouslySetInnerHTML={{ __html: s.svg }} />
+            </button>
+          ))}
+        </div>
       </div>
     </div>
   );

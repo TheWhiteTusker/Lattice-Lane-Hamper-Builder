@@ -95,6 +95,25 @@ export const LayerSchema = z.discriminatedUnion("kind", [
     innerRadius: z.number().positive(),
     outerRadius: z.number().positive(),
   }),
+  z.object({
+    ...base,
+    kind: z.literal("line"),
+    points: z.array(z.number()),
+    stroke: color,
+    strokeWidth: z.number().min(1).default(4),
+    dash: z.array(z.number()).optional(),
+    lineCap: z.enum(["round", "butt", "square"]).default("round"),
+  }),
+  z.object({
+    ...base,
+    kind: z.literal("curve"),
+    points: z.array(z.number()),
+    stroke: color,
+    strokeWidth: z.number().min(1).default(4),
+    curvature: z.number().default(0.5),
+    dash: z.array(z.number()).optional(),
+    lineCap: z.enum(["round", "butt", "square"]).default("round"),
+  }),
 ]);
 
 export const CanvasSchema = z.object({
@@ -138,6 +157,10 @@ export function layerLabel(l: Layer): string {
       return l.sides === 3 ? "Triangle" : l.sides === 6 ? "Hexagon" : `${l.sides}-sided shape`;
     case "star":
       return "Star";
+    case "line":
+      return "Line";
+    case "curve":
+      return "Curved line";
   }
 }
 
@@ -217,7 +240,7 @@ export function fillProps(fill: Fill, w: number, h: number, ox = 0, oy = 0) {
 
 type ImageSize = { naturalWidth: number; naturalHeight: number };
 
-export type KonvaShape = "Image" | "Text" | "Rect" | "Ellipse" | "RegularPolygon" | "Star";
+export type KonvaShape = "Image" | "Text" | "Rect" | "Ellipse" | "RegularPolygon" | "Star" | "Line";
 
 /**
  * The Konva class and attributes that draw a layer. Shared by the editor, the
@@ -296,6 +319,33 @@ export function layerConfig(l: Layer, img?: ImageSize): { shape: KonvaShape; att
           innerRadius: l.innerRadius,
           outerRadius: l.outerRadius,
           ...fillProps(l.fill, l.outerRadius * 2, l.outerRadius * 2, -l.outerRadius, -l.outerRadius),
+        },
+      };
+    case "line":
+      return {
+        shape: "Line",
+        attrs: {
+          ...common,
+          points: l.points,
+          stroke: l.stroke,
+          strokeWidth: l.strokeWidth,
+          lineCap: l.lineCap ?? "round",
+          lineJoin: "round",
+          ...(l.dash && l.dash.length ? { dash: l.dash } : {}),
+        },
+      };
+    case "curve":
+      return {
+        shape: "Line",
+        attrs: {
+          ...common,
+          points: l.points,
+          bezier: true,
+          stroke: l.stroke,
+          strokeWidth: l.strokeWidth,
+          lineCap: l.lineCap ?? "round",
+          lineJoin: "round",
+          ...(l.dash && l.dash.length ? { dash: l.dash } : {}),
         },
       };
   }

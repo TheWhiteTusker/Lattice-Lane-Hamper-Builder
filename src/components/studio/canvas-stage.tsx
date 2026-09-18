@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type Konva from "konva";
 import {
+  Circle,
   Ellipse,
   Group,
   Image as KImage,
@@ -28,6 +29,7 @@ import {
   Redo2,
   Scaling,
   Undo2,
+  X,
 } from "lucide-react";
 import {
   CANVAS_PRESETS,
@@ -37,6 +39,7 @@ import {
   alignToPage,
   boundsOf,
   distributeBoxes,
+  fillCss,
   fillProps,
   fitScale,
   intersects,
@@ -60,7 +63,7 @@ import { SlideThumb } from "./slide-thumb";
 import { ContextToolbar } from "./context-toolbar";
 import { LayersPanel, TransformPanel } from "./layers-panel";
 import { Rail, SidePanel, type SideTab } from "./side-panels";
-import { PageSizeInputs, Popover, ToolButton, accentBtn, cx, fieldCls, panelTitle, toolBtn } from "./studio-ui";
+import { ColorPanel, PageSizeInputs, Popover, ToolButton, accentBtn, cx, fieldCls, panelTitle, toolBtn } from "./studio-ui";
 
 /** Canvas-drawn colours; keep in step with the .studio tokens in globals.css. */
 const STUDIO_COLORS = {
@@ -183,6 +186,18 @@ export default function CanvasStage({
   const [board, setBoard] = useState({ w: 0, h: 0 });
   const [view, setView] = useState<{ zoom: number | null; panX: number; panY: number }>({ zoom: null, panX: 0, panY: 0 });
   const [spaceDown, setSpaceDown] = useState(false);
+  const [activeTool, setActiveTool] = useState<"select" | "line" | "curve">("select");
+  const [drawingState, setDrawingState] = useState<{
+    start: { x: number; y: number };
+    current: { x: number; y: number };
+    tool: "line" | "curve";
+  } | null>(null);
+  const [colorPopover, setColorPopover] = useState<{
+    mode: "fill" | "stroke";
+    ids: string[];
+    x: number;
+    y: number;
+  } | null>(null);
 
   useEffect(() => {
     const el = boardRef.current;
@@ -213,6 +228,7 @@ export default function CanvasStage({
       };
     });
   const zoomFit = () => setView({ zoom: null, panX: 0, panY: 0 });
+  const recenter = () => setView((v) => ({ zoom: v.zoom ?? fit, panX: 0, panY: 0 }));
 
   // Wheel: pan, or zoom at the cursor with Ctrl. Needs a non-passive listener.
   useEffect(() => {
@@ -498,7 +514,7 @@ export default function CanvasStage({
     addFill(canvas.background.fill);
     for (const l of canvas.layers) {
       if (l.kind === "image") continue;
-      addFill(l.fill);
+      if ("fill" in l && l.fill) addFill(l.fill);
       if ("stroke" in l && l.strokeWidth > 0) set.add(l.stroke);
     }
     return [...set];
@@ -540,6 +556,8 @@ export default function CanvasStage({
     uploading,
     cutOut,
     removing,
+    activeTool,
+    setActiveTool,
   };
 
   /* --------------------------------------------------------- save/export */
@@ -747,14 +765,16 @@ export default function CanvasStage({
   /* ------------------------------------------------------- konva wiring */
   useEffect(() => {
     // A lone locked layer still shows its box; in a group, locked layers stay out so they don't move.
-    const attach = editingId
+    // Single line or curve uses direct endpoint/bend handles instead of a box transformer.
+    const isSingleLine = selectedIds.length === 1 && (selected?.kind === "line" || selected?.kind === "curve");
+    const attach = editingId || isSingleLine
       ? []
       : canvas.layers
           .filter((l) => selectedIds.includes(l.id) && l.visible && (selectedIds.length === 1 || !l.locked))
           .flatMap((l) => nodes.current.get(l.id) ?? []);
     trRef.current?.nodes(attach);
     trRef.current?.getLayer()?.batchDraw();
-  }, [selectedIds, editingId, canvas.layers, fontTick, zoom]);
+  }, [selectedIds, editingId, canvas.layers, fontTick, zoom, selected]);
 
   // Size the inline text editor to its content.
   useLayoutEffect(() => {
@@ -831,14 +851,15 @@ export default function CanvasStage({
     scaleY: l.scaleY,
     opacity: l.opacity,
     visible: l.visible && editingId !== l.id,
-    draggable: !l.locked && !spaceDown,
+    draggable: !l.locked && !spaceDown && activeTool === "select",
     onMouseDown: (e: Konva.KonvaEventObject<MouseEvent>) => {
+      if (activeTool !== "select") return;
       if (e.evt.button !== 0 || spaceDown) return;
       if (e.evt.shiftKey || e.evt.ctrlKey || e.evt.metaKey) toggleSelect(l.id);
       // Pressing on part of a selection keeps it, so the whole group can be dragged.
       else if (!selectedIds.includes(l.id)) select(l.id);
     },
-    onTap: () => select(l.id),
+    onTap: () => activeTool === "select" && select(l.id),
     onContextMenu: (e: Konva.KonvaEventObject<PointerEvent>) => {
       e.evt.preventDefault();
       if (!selectedIds.includes(l.id)) select(l.id);
@@ -902,6 +923,14 @@ export default function CanvasStage({
         : undefined;
 
   const editColor = editing ? (editing.fill.type === "solid" ? editing.fill.color : editing.fill.from) : undefined;
+  const isShapeSelection = selection.some(
+    (l) => l.kind === "rect" || l.kind === "ellipse" || l.kind === "polygon" || l.kind === "star" || l.kind === "line" || l.kind === "curve",
+  );
+  const hasFill = selection.some(
+    (l) => l.kind === "rect" || l.kind === "ellipse" || l.kind === "polygon" || l.kind === "star",
+  );
+  const hasStroke = selection.some((l) => "stroke" in l);
+  const isOnlyLine = selection.length > 0 && selection.every((l) => l.kind === "line" || l.kind === "curve");
 
   /* ------------------------------------------------------------- render */
   return (
@@ -998,7 +1027,10 @@ export default function CanvasStage({
           {/* Pasteboard */}
           <div
             ref={boardRef}
-            className={cx("relative min-h-0 flex-1 overflow-hidden", spaceDown && "cursor-grab")}
+            className={cx(
+              "relative min-h-0 flex-1 overflow-hidden",
+              spaceDown ? "cursor-grab" : activeTool !== "select" ? "cursor-crosshair" : undefined,
+            )}
             onPointerDown={(e) => {
               // Space+drag or middle-drag pans, After Effects style.
               if (!(spaceDown || e.button === 1)) return;
@@ -1042,12 +1074,79 @@ export default function CanvasStage({
                 width={board.w}
                 height={board.h}
                 onMouseDown={(e) => {
+                  if (activeTool === "line" || activeTool === "curve") {
+                    const page = pageRef.current;
+                    if (!page) return;
+                    const pos = page.getRelativePointerPosition();
+                    if (!pos) return;
+                    setDrawingState({
+                      start: { x: pos.x, y: pos.y },
+                      current: { x: pos.x, y: pos.y },
+                      tool: activeTool,
+                    });
+                    return;
+                  }
                   const name = e.target.name();
                   const empty = e.target === e.target.getStage() || name === "bg" || name === "page-shadow";
                   if (!empty || e.evt.button !== 0 || spaceDown) return;
                   const additive = e.evt.shiftKey || e.evt.ctrlKey || e.evt.metaKey;
                   if (!additive) select(null);
                   startMarquee(e.evt, additive);
+                }}
+                onMouseMove={() => {
+                  if (drawingState) {
+                    const page = pageRef.current;
+                    if (!page) return;
+                    const pos = page.getRelativePointerPosition();
+                    if (pos) {
+                      setDrawingState((s) => (s ? { ...s, current: { x: pos.x, y: pos.y } } : null));
+                    }
+                  }
+                }}
+                onMouseUp={() => {
+                  if (drawingState) {
+                    const dx = drawingState.current.x - drawingState.start.x;
+                    const dy = drawingState.current.y - drawingState.start.y;
+                    const dist = Math.hypot(dx, dy);
+                    if (dist >= 8) {
+                      const x = Math.round(drawingState.start.x);
+                      const y = Math.round(drawingState.start.y);
+                      if (drawingState.tool === "line") {
+                        const newLayer: Layer = {
+                          ...baseLayer(x, y),
+                          kind: "line",
+                          points: [0, 0, Math.round(dx), Math.round(dy)],
+                          stroke: "#2c332f",
+                          strokeWidth: 4,
+                          lineCap: "round",
+                        };
+                        ed.add(newLayer);
+                        select(newLayer.id);
+                      } else {
+                        const midX = dx / 2;
+                        const midY = dy / 2;
+                        const len = dist || 1;
+                        const nx = -dy / len;
+                        const ny = dx / len;
+                        const offset = (len * 0.4) / 2;
+                        const cx = midX + nx * offset;
+                        const cy = midY + ny * offset;
+                        const newLayer: Layer = {
+                          ...baseLayer(x, y),
+                          kind: "curve",
+                          points: [0, 0, Math.round(cx), Math.round(cy), Math.round(dx), Math.round(dy)],
+                          curvature: 0.4,
+                          stroke: "#2c332f",
+                          strokeWidth: 4,
+                          lineCap: "round",
+                        };
+                        ed.add(newLayer);
+                        select(newLayer.id);
+                      }
+                    }
+                    setDrawingState(null);
+                    setActiveTool("select");
+                  }
                 }}
                 onContextMenu={(e) => {
                   e.evt.preventDefault();
@@ -1106,6 +1205,187 @@ export default function CanvasStage({
                       <Line key={`h${y}`} points={[-40 / zoom, y, W + 40 / zoom, y]} stroke={STUDIO_COLORS.guide} strokeWidth={1 / zoom} />
                     ))}
                   </Group>
+
+                  {/* Drawing preview (MS Paint style) */}
+                  {drawingState && (
+                    <Group x={ox} y={oy} scaleX={zoom} scaleY={zoom} listening={false}>
+                      <Line
+                        points={
+                          drawingState.tool === "curve"
+                            ? [
+                                drawingState.start.x,
+                                drawingState.start.y,
+                                (drawingState.start.x + drawingState.current.x) / 2 - (drawingState.current.y - drawingState.start.y) * 0.2,
+                                (drawingState.start.y + drawingState.current.y) / 2 + (drawingState.current.x - drawingState.start.x) * 0.2,
+                                drawingState.current.x,
+                                drawingState.current.y,
+                              ]
+                            : [
+                                drawingState.start.x,
+                                drawingState.start.y,
+                                drawingState.current.x,
+                                drawingState.current.y,
+                              ]
+                        }
+                        bezier={drawingState.tool === "curve"}
+                        stroke="#2c332f"
+                        strokeWidth={4 / zoom}
+                        lineCap="round"
+                      />
+                    </Group>
+                  )}
+
+                  {/* Interactive handles for selected single Line or Curve */}
+                  {selected && !multi && selected.kind === "line" && !selected.locked && (
+                    <Group x={ox} y={oy} scaleX={zoom} scaleY={zoom}>
+                      <Circle
+                        x={selected.x + selected.points[0]}
+                        y={selected.y + selected.points[1]}
+                        radius={7 / zoom}
+                        fill="#ffffff"
+                        stroke={ACCENT}
+                        strokeWidth={2.5 / zoom}
+                        draggable
+                        onDragMove={(e) => {
+                          const nx = Math.round(e.target.x());
+                          const ny = Math.round(e.target.y());
+                          const endX = selected.x + selected.points[2];
+                          const endY = selected.y + selected.points[3];
+                          patch(
+                            selected.id,
+                            {
+                              x: nx,
+                              y: ny,
+                              points: [0, 0, endX - nx, endY - ny],
+                            },
+                            "line-handle",
+                          );
+                        }}
+                      />
+                      <Circle
+                        x={selected.x + selected.points[2]}
+                        y={selected.y + selected.points[3]}
+                        radius={7 / zoom}
+                        fill="#ffffff"
+                        stroke={ACCENT}
+                        strokeWidth={2.5 / zoom}
+                        draggable
+                        onDragMove={(e) => {
+                          const nx = Math.round(e.target.x());
+                          const ny = Math.round(e.target.y());
+                          patch(
+                            selected.id,
+                            {
+                              points: [0, 0, nx - selected.x, ny - selected.y],
+                            },
+                            "line-handle",
+                          );
+                        }}
+                      />
+                    </Group>
+                  )}
+
+                  {selected && !multi && selected.kind === "curve" && !selected.locked && (
+                    <Group x={ox} y={oy} scaleX={zoom} scaleY={zoom}>
+                      <Line
+                        points={[
+                          selected.x + selected.points[0],
+                          selected.y + selected.points[1],
+                          selected.x + selected.points[2],
+                          selected.y + selected.points[3],
+                          selected.x + selected.points[4],
+                          selected.y + selected.points[5],
+                        ]}
+                        stroke={ACCENT}
+                        strokeWidth={1.5 / zoom}
+                        dash={[4 / zoom, 4 / zoom]}
+                        listening={false}
+                      />
+                      <Circle
+                        x={selected.x + selected.points[0]}
+                        y={selected.y + selected.points[1]}
+                        radius={7 / zoom}
+                        fill="#ffffff"
+                        stroke={ACCENT}
+                        strokeWidth={2.5 / zoom}
+                        draggable
+                        onDragMove={(e) => {
+                          const nx = Math.round(e.target.x());
+                          const ny = Math.round(e.target.y());
+                          const oldX = selected.x;
+                          const oldY = selected.y;
+                          const dx = nx - oldX;
+                          const dy = ny - oldY;
+                          patch(
+                            selected.id,
+                            {
+                              x: nx,
+                              y: ny,
+                              points: [
+                                0,
+                                0,
+                                selected.points[2] - dx,
+                                selected.points[3] - dy,
+                                selected.points[4] - dx,
+                                selected.points[5] - dy,
+                              ],
+                            },
+                            "curve-handle",
+                          );
+                        }}
+                      />
+                      <Circle
+                        x={selected.x + selected.points[2]}
+                        y={selected.y + selected.points[3]}
+                        radius={8.5 / zoom}
+                        fill={ACCENT}
+                        stroke="#ffffff"
+                        strokeWidth={2.5 / zoom}
+                        draggable
+                        onDragMove={(e) => {
+                          const ncx = Math.round(e.target.x() - selected.x);
+                          const ncy = Math.round(e.target.y() - selected.y);
+                          const endX = selected.points[4] ?? 300;
+                          const endY = selected.points[5] ?? 0;
+                          const midX = endX / 2;
+                          const midY = endY / 2;
+                          const len = Math.hypot(endX, endY) || 1;
+                          const nx = -endY / len;
+                          const ny = endX / len;
+                          const proj = (ncx - midX) * nx + (ncy - midY) * ny;
+                          const curvature = Number(((proj * 2) / len).toFixed(2));
+                          patch(
+                            selected.id,
+                            {
+                              curvature,
+                              points: [0, 0, ncx, ncy, selected.points[4], selected.points[5]],
+                            },
+                            "curve-handle",
+                          );
+                        }}
+                      />
+                      <Circle
+                        x={selected.x + selected.points[4]}
+                        y={selected.y + selected.points[5]}
+                        radius={7 / zoom}
+                        fill="#ffffff"
+                        stroke={ACCENT}
+                        strokeWidth={2.5 / zoom}
+                        draggable
+                        onDragMove={(e) => {
+                          const nx = Math.round(e.target.x() - selected.x);
+                          const ny = Math.round(e.target.y() - selected.y);
+                          patch(
+                            selected.id,
+                            {
+                              points: [0, 0, selected.points[2], selected.points[3], nx, ny],
+                            },
+                            "curve-handle",
+                          );
+                        }}
+                      />
+                    </Group>
+                  )}
 
                   <Transformer
                     ref={trRef}
@@ -1289,6 +1569,9 @@ export default function CanvasStage({
               <ToolButton title="Fit page to screen (Ctrl+0)" active={view.zoom === null} onClick={zoomFit}>
                 Fit
               </ToolButton>
+              <ToolButton title="Re-centre page at current size" active={view.zoom !== null && view.panX === 0 && view.panY === 0} onClick={recenter}>
+                Re-centre
+              </ToolButton>
             </div>
           </footer>
         </div>
@@ -1303,9 +1586,31 @@ export default function CanvasStage({
         <ContextMenu
           x={menu.x}
           y={menu.y}
+          selection={selection}
+          documentColors={documentColors}
+          onApplyColor={(c) => {
+            if (isOnlyLine) {
+              patchEach(selectedIds, { stroke: c, strokeWidth: Math.max(1, selected && "strokeWidth" in selected ? selected.strokeWidth : 4) });
+            } else if (hasFill) {
+              patchEach(selectedIds, { fill: { type: "solid", color: c } });
+            } else if (hasStroke) {
+              patchEach(selectedIds, { stroke: c, strokeWidth: Math.max(1, selected && "strokeWidth" in selected ? selected.strokeWidth : 4) });
+            }
+          }}
           items={
             selection.length
               ? [
+                  ...(isShapeSelection
+                    ? ([
+                        ...(hasFill
+                          ? [["Edit fill colour…", "", () => setColorPopover({ mode: "fill", ids: selectedIds, x: menu.x, y: menu.y })] as MenuItem]
+                          : []),
+                        ...(hasStroke
+                          ? [[isOnlyLine ? "Edit line colour…" : "Edit border colour…", "", () => setColorPopover({ mode: "stroke", ids: selectedIds, x: menu.x, y: menu.y })] as MenuItem]
+                          : []),
+                        null,
+                      ] as MenuItem[])
+                    : []),
                   ["Copy", "Ctrl+C", () => setClipboard(selection)],
                   ["Paste", "Ctrl+V", clipboard.length ? paste : null],
                   [multi ? `Duplicate ${selection.length} elements` : "Duplicate", "Ctrl+D", () => duplicate(selectedIds)],
@@ -1338,10 +1643,69 @@ export default function CanvasStage({
                   ["Paste", "Ctrl+V", clipboard.length ? paste : null],
                   ["Select all", "Ctrl+A", canvas.layers.length ? selectAll : null],
                   ["Fit page to screen", "Ctrl+0", zoomFit],
+                  ["Re-centre at current size", "", recenter],
                 ]
           }
           onClose={() => setMenu(null)}
         />
+      )}
+
+      {colorPopover && (
+        <div
+          role="dialog"
+          aria-label="Edit colours"
+          className="studio fixed z-[75] w-72 rounded-lg border border-[var(--st-line)] bg-[var(--st-panel)] p-3 shadow-2xl shadow-[#2c332f]/25"
+          style={{
+            left: Math.min(colorPopover.x, window.innerWidth - 300),
+            top: Math.min(colorPopover.y, Math.max(10, window.innerHeight - 440)),
+          }}
+          onPointerDown={(e) => e.stopPropagation()}
+          onContextMenu={(e) => e.preventDefault()}
+        >
+          <div className="mb-3 flex items-center justify-between border-b border-[var(--st-line)] pb-2">
+            <span className="text-[12px] font-semibold">
+              {colorPopover.mode === "fill" ? "Fill colour" : "Line / Border colour"}
+            </span>
+            <button
+              type="button"
+              onClick={() => setColorPopover(null)}
+              className="rounded p-1 text-[var(--st-muted)] hover:bg-[var(--st-hover)] hover:text-[var(--st-text)]"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+          <ColorPanel
+            fill={(() => {
+              const target = canvas.layers.find((l) => colorPopover.ids.includes(l.id));
+              if (colorPopover.mode === "fill" && target && "fill" in target) {
+                return target.fill;
+              }
+              if (target && "stroke" in target) {
+                return { type: "solid", color: target.stroke };
+              }
+              return { type: "solid", color: "#54655b" };
+            })()}
+            documentColors={documentColors}
+            allowGradient={colorPopover.mode === "fill"}
+            onChange={(newFill) => {
+              if (colorPopover.mode === "fill") {
+                patchEach(colorPopover.ids, { fill: newFill }, "shape-color");
+              } else {
+                const color = newFill.type === "solid" ? newFill.color : newFill.from;
+                const target = canvas.layers.find((l) => colorPopover.ids.includes(l.id));
+                const sw = target && "strokeWidth" in target ? target.strokeWidth : 4;
+                patchEach(
+                  colorPopover.ids,
+                  {
+                    stroke: color,
+                    strokeWidth: Math.max(1, sw),
+                  },
+                  "shape-color",
+                );
+              }
+            }}
+          />
+        </div>
       )}
     </div>
   );
@@ -1349,10 +1713,49 @@ export default function CanvasStage({
 
 type MenuItem = [label: string, keys: string, run: (() => unknown) | null] | null;
 
-function ContextMenu({ x, y, items, onClose }: { x: number; y: number; items: MenuItem[]; onClose: () => void }) {
+function ContextMenu({
+  x,
+  y,
+  items,
+  selection,
+  documentColors,
+  onApplyColor,
+  onClose,
+}: {
+  x: number;
+  y: number;
+  items: MenuItem[];
+  selection?: Layer[];
+  documentColors?: string[];
+  onApplyColor?: (color: string) => void;
+  onClose: () => void;
+}) {
+  const hasShape = selection?.some(
+    (l) => l.kind === "rect" || l.kind === "ellipse" || l.kind === "polygon" || l.kind === "star" || l.kind === "line" || l.kind === "curve",
+  );
+  const isOnlyLine = selection && selection.length > 0 && selection.every((l) => l.kind === "line" || l.kind === "curve");
+  const firstShape = selection?.find((l) => "fill" in l || "stroke" in l);
+  const currentPreview = firstShape
+    ? "fill" in firstShape && !isOnlyLine
+      ? fillCss(firstShape.fill)
+      : "stroke" in firstShape
+        ? firstShape.stroke
+        : "#54655b"
+    : "#54655b";
+  const currentHex = firstShape
+    ? "stroke" in firstShape && isOnlyLine
+      ? firstShape.stroke
+      : "fill" in firstShape && firstShape.fill.type === "solid"
+        ? firstShape.fill.color
+        : "#54655b"
+    : "#54655b";
+
+  const brandColors = ["#2c332f", "#54655b", "#ddcf8b", "#b08d57", "#c0392b", "#ffffff"];
+  const quickColors = [...new Set([...brandColors, ...(documentColors ?? []).slice(0, 3)])].slice(0, 7);
+
   // Keep the menu on screen near the right and bottom edges.
   const left = Math.min(x, window.innerWidth - 240);
-  const top = Math.min(y, window.innerHeight - items.length * 30 - 16);
+  const top = Math.min(y, Math.max(10, window.innerHeight - items.length * 30 - (hasShape ? 70 : 0) - 16));
   return (
     <div
       role="menu"
@@ -1361,6 +1764,44 @@ function ContextMenu({ x, y, items, onClose }: { x: number; y: number; items: Me
       onPointerDown={(e) => e.stopPropagation()}
       onContextMenu={(e) => e.preventDefault()}
     >
+      {hasShape && onApplyColor && (
+        <div className="border-b border-[var(--st-line)] px-2.5 py-2">
+          <div className="mb-1.5 flex items-center justify-between text-[10.5px] font-semibold uppercase tracking-wider text-[var(--st-muted)]">
+            <span>{isOnlyLine ? "Line colour" : "Shape colour"}</span>
+            <span className="h-3.5 w-3.5 rounded-full border border-black/20" style={{ background: currentPreview }} />
+          </div>
+          <div className="flex items-center gap-1.5">
+            {quickColors.map((c) => (
+              <button
+                key={c}
+                type="button"
+                title={c}
+                onClick={() => {
+                  onApplyColor(c);
+                  onClose();
+                }}
+                className="h-5 w-5 rounded-full border border-black/15 transition-transform hover:scale-110"
+                style={{ background: c }}
+              />
+            ))}
+            <label
+              title="Pick custom colour"
+              className="relative flex h-5 w-5 cursor-pointer items-center justify-center rounded-full border border-black/15 transition-transform hover:scale-110"
+              style={{ background: "conic-gradient(red, yellow, lime, cyan, blue, magenta, red)" }}
+            >
+              <input
+                type="color"
+                value={currentHex}
+                onChange={(e) => {
+                  onApplyColor(e.target.value);
+                  onClose();
+                }}
+                className="absolute inset-0 cursor-pointer opacity-0"
+              />
+            </label>
+          </div>
+        </div>
+      )}
       {items.map((item, i) =>
         item === null ? (
           <div key={i} className="my-1 h-px bg-[var(--st-line)]" />
@@ -1376,7 +1817,18 @@ function ContextMenu({ x, y, items, onClose }: { x: number; y: number; items: Me
             }}
             className="flex w-full items-center justify-between rounded px-2.5 py-1.5 text-left text-[13px] hover:bg-[var(--st-hover)] disabled:opacity-35 disabled:hover:bg-transparent"
           >
-            {item[0]}
+            <span className="flex items-center gap-2">
+              {item[0].startsWith("Edit fill") && (
+                <span className="h-3 w-3 rounded-full border border-black/15" style={{ background: currentPreview }} />
+              )}
+              {item[0].startsWith("Edit border") && (
+                <span className="h-3 w-3 rounded border border-black/30" style={{ borderColor: currentHex }} />
+              )}
+              {item[0].startsWith("Edit line") && (
+                <span className="h-0.5 w-3.5 rounded" style={{ background: currentHex }} />
+              )}
+              {item[0]}
+            </span>
             <span className="text-[11px] text-[var(--st-muted)]">{item[1]}</span>
           </button>
         ),
@@ -1385,8 +1837,8 @@ function ContextMenu({ x, y, items, onClose }: { x: number; y: number; items: Me
   );
 }
 
-const KONVA_SHAPES = { Rect, Ellipse, RegularPolygon, Star } as unknown as Record<
-  "Rect" | "Ellipse" | "RegularPolygon" | "Star",
+const KONVA_SHAPES = { Rect, Ellipse, RegularPolygon, Star, Line } as unknown as Record<
+  "Rect" | "Ellipse" | "RegularPolygon" | "Star" | "Line",
   React.ComponentType<Record<string, unknown>>
 >;
 
