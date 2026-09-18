@@ -25,6 +25,7 @@ import {
   Underline,
   Lock,
   LockOpen,
+  Magnet,
   Maximize2,
   Minus,
   Plus,
@@ -118,6 +119,14 @@ function PageTools({ ed }: { ed: Editor }) {
       >
         <Spline className="h-4 w-4" />
         <span>Curve</span>
+      </ToolButton>
+      <ToolButton
+        title={ed.snapRightAngles ? "Snap right angles: ON (click to disable)" : "Snap right angles: OFF (click to enable)"}
+        active={ed.snapRightAngles}
+        onClick={() => ed.setSnapRightAngles((s) => !s)}
+      >
+        <Magnet className="h-4 w-4" />
+        <span>Snap 90°</span>
       </ToolButton>
       <span className="ml-auto text-[12px] text-[var(--st-muted)]">
         Click to select · Shift+click or drag a box to select several · right-click for more
@@ -540,6 +549,15 @@ function LineTools({ ed, l }: { ed: Editor; l: Extract<Layer, { kind: "line" | "
           </div>
         </Popover>
       )}
+
+      <ToolButton
+        title={ed.snapRightAngles ? "Snap right angles: ON (click to disable)" : "Snap right angles: OFF (click to enable)"}
+        active={ed.snapRightAngles}
+        onClick={() => ed.setSnapRightAngles((s) => !s)}
+      >
+        <Magnet className="h-4 w-4" />
+        <span>Snap 90°</span>
+      </ToolButton>
 
       <Divider />
     </>

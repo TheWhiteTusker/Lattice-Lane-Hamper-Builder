@@ -367,6 +367,15 @@ function ElementsPanel({ ed }: { ed: Editor }) {
             <span>Draw Curve</span>
           </button>
         </div>
+        <label className="mt-2.5 flex cursor-pointer items-center gap-2 px-1 text-[11.5px] text-[var(--st-muted)] hover:text-[var(--st-text)] select-none">
+          <input
+            type="checkbox"
+            checked={ed.snapRightAngles}
+            onChange={(e) => ed.setSnapRightAngles(e.target.checked)}
+            className="h-3.5 w-3.5 rounded border-[var(--st-line)] text-[var(--st-accent)] focus:ring-0"
+          />
+          <span>Snap to right angles (0° / 90°)</span>
+        </label>
       </div>
       <div>
         <div className={cx(panelTitle, "mb-2")}>Shapes</div>

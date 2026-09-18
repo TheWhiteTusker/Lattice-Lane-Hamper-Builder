@@ -48,6 +48,7 @@ import {
   redo,
   reorderLayer,
   snap,
+  snapToRightAngle,
   startHistory,
   undo,
   type Box,
@@ -105,6 +106,7 @@ const SHORTCUTS: [string, string][] = [
   ["Zoom at cursor", "Ctrl+scroll"],
   ["Pan", "Scroll, or hold Space and drag"],
   ["Place freely (no snapping)", "Hold Alt while dragging"],
+  ["Snap line (0° / 90° / 45°)", "Hold Shift to lock 45° increments"],
 ];
 
 export default function CanvasStage({
@@ -187,6 +189,7 @@ export default function CanvasStage({
   const [view, setView] = useState<{ zoom: number | null; panX: number; panY: number }>({ zoom: null, panX: 0, panY: 0 });
   const [spaceDown, setSpaceDown] = useState(false);
   const [activeTool, setActiveTool] = useState<"select" | "line" | "curve">("select");
+  const [snapRightAngles, setSnapRightAngles] = useState(true);
   const [drawingState, setDrawingState] = useState<{
     start: { x: number; y: number };
     current: { x: number; y: number };
@@ -558,6 +561,8 @@ export default function CanvasStage({
     removing,
     activeTool,
     setActiveTool,
+    snapRightAngles,
+    setSnapRightAngles,
   };
 
   /* --------------------------------------------------------- save/export */
@@ -1093,17 +1098,29 @@ export default function CanvasStage({
                   if (!additive) select(null);
                   startMarquee(e.evt, additive);
                 }}
-                onMouseMove={() => {
+                onMouseMove={(e) => {
                   if (drawingState) {
                     const page = pageRef.current;
                     if (!page) return;
                     const pos = page.getRelativePointerPosition();
                     if (pos) {
-                      setDrawingState((s) => (s ? { ...s, current: { x: pos.x, y: pos.y } } : null));
+                      const snapped = snapToRightAngle(drawingState.start, pos, {
+                        enabled: snapRightAngles,
+                        shiftKey: e.evt.shiftKey,
+                      });
+                      setDrawingState((s) => (s ? { ...s, current: { x: snapped.x, y: snapped.y } } : null));
+                      if (snapped.snapped === "horizontal") {
+                        setGuides({ vertical: [], horizontal: [drawingState.start.y] });
+                      } else if (snapped.snapped === "vertical") {
+                        setGuides({ vertical: [drawingState.start.x], horizontal: [] });
+                      } else {
+                        setGuides(null);
+                      }
                     }
                   }
                 }}
                 onMouseUp={() => {
+                  setGuides(null);
                   if (drawingState) {
                     const dx = drawingState.current.x - drawingState.start.x;
                     const dy = drawingState.current.y - drawingState.start.y;
@@ -1189,7 +1206,11 @@ export default function CanvasStage({
                         );
                       }
                       const Shape = KONVA_SHAPES[shape as keyof typeof KONVA_SHAPES];
-                      return <Shape key={l.id} {...attrs} {...common(l)} />;
+                      const extraAttrs =
+                        l.kind === "line" || l.kind === "curve"
+                          ? { hitStrokeWidth: Math.max(32, (l.strokeWidth ?? 4) + 24, 24 / zoom) }
+                          : {};
+                      return <Shape key={l.id} {...attrs} {...extraAttrs} {...common(l)} />;
                     })}
                   </Group>
 
@@ -1241,16 +1262,33 @@ export default function CanvasStage({
                       <Circle
                         x={selected.x + selected.points[0]}
                         y={selected.y + selected.points[1]}
-                        radius={7 / zoom}
+                        radius={8 / zoom}
+                        hitStrokeWidth={14 / zoom}
                         fill="#ffffff"
                         stroke={ACCENT}
                         strokeWidth={2.5 / zoom}
                         draggable
                         onDragMove={(e) => {
-                          const nx = Math.round(e.target.x());
-                          const ny = Math.round(e.target.y());
+                          const rawX = e.target.x();
+                          const rawY = e.target.y();
                           const endX = selected.x + selected.points[2];
                           const endY = selected.y + selected.points[3];
+                          const snapped = snapToRightAngle(
+                            { x: endX, y: endY },
+                            { x: rawX, y: rawY },
+                            { enabled: snapRightAngles, shiftKey: e.evt.shiftKey },
+                          );
+                          const nx = Math.round(snapped.x);
+                          const ny = Math.round(snapped.y);
+                          e.target.x(nx);
+                          e.target.y(ny);
+                          if (snapped.snapped === "horizontal") {
+                            setGuides({ vertical: [], horizontal: [endY] });
+                          } else if (snapped.snapped === "vertical") {
+                            setGuides({ vertical: [endX], horizontal: [] });
+                          } else {
+                            setGuides(null);
+                          }
                           patch(
                             selected.id,
                             {
@@ -1261,26 +1299,47 @@ export default function CanvasStage({
                             "line-handle",
                           );
                         }}
+                        onDragEnd={() => setGuides(null)}
                       />
                       <Circle
                         x={selected.x + selected.points[2]}
                         y={selected.y + selected.points[3]}
-                        radius={7 / zoom}
+                        radius={8 / zoom}
+                        hitStrokeWidth={14 / zoom}
                         fill="#ffffff"
                         stroke={ACCENT}
                         strokeWidth={2.5 / zoom}
                         draggable
                         onDragMove={(e) => {
-                          const nx = Math.round(e.target.x());
-                          const ny = Math.round(e.target.y());
+                          const rawX = e.target.x();
+                          const rawY = e.target.y();
+                          const startX = selected.x;
+                          const startY = selected.y;
+                          const snapped = snapToRightAngle(
+                            { x: startX, y: startY },
+                            { x: rawX, y: rawY },
+                            { enabled: snapRightAngles, shiftKey: e.evt.shiftKey },
+                          );
+                          const nx = Math.round(snapped.x - startX);
+                          const ny = Math.round(snapped.y - startY);
+                          e.target.x(startX + nx);
+                          e.target.y(startY + ny);
+                          if (snapped.snapped === "horizontal") {
+                            setGuides({ vertical: [], horizontal: [startY] });
+                          } else if (snapped.snapped === "vertical") {
+                            setGuides({ vertical: [startX], horizontal: [] });
+                          } else {
+                            setGuides(null);
+                          }
                           patch(
                             selected.id,
                             {
-                              points: [0, 0, nx - selected.x, ny - selected.y],
+                              points: [0, 0, nx, ny],
                             },
                             "line-handle",
                           );
                         }}
+                        onDragEnd={() => setGuides(null)}
                       />
                     </Group>
                   )}
@@ -1304,16 +1363,35 @@ export default function CanvasStage({
                       <Circle
                         x={selected.x + selected.points[0]}
                         y={selected.y + selected.points[1]}
-                        radius={7 / zoom}
+                        radius={8 / zoom}
+                        hitStrokeWidth={14 / zoom}
                         fill="#ffffff"
                         stroke={ACCENT}
                         strokeWidth={2.5 / zoom}
                         draggable
                         onDragMove={(e) => {
-                          const nx = Math.round(e.target.x());
-                          const ny = Math.round(e.target.y());
+                          const rawX = e.target.x();
+                          const rawY = e.target.y();
                           const oldX = selected.x;
                           const oldY = selected.y;
+                          const endX = oldX + (selected.points[4] ?? 300);
+                          const endY = oldY + (selected.points[5] ?? 0);
+                          const snapped = snapToRightAngle(
+                            { x: endX, y: endY },
+                            { x: rawX, y: rawY },
+                            { enabled: snapRightAngles, shiftKey: e.evt.shiftKey },
+                          );
+                          const nx = Math.round(snapped.x);
+                          const ny = Math.round(snapped.y);
+                          e.target.x(nx);
+                          e.target.y(ny);
+                          if (snapped.snapped === "horizontal") {
+                            setGuides({ vertical: [], horizontal: [endY] });
+                          } else if (snapped.snapped === "vertical") {
+                            setGuides({ vertical: [endX], horizontal: [] });
+                          } else {
+                            setGuides(null);
+                          }
                           const dx = nx - oldX;
                           const dy = ny - oldY;
                           patch(
@@ -1333,11 +1411,13 @@ export default function CanvasStage({
                             "curve-handle",
                           );
                         }}
+                        onDragEnd={() => setGuides(null)}
                       />
                       <Circle
                         x={selected.x + selected.points[2]}
                         y={selected.y + selected.points[3]}
-                        radius={8.5 / zoom}
+                        radius={9.5 / zoom}
+                        hitStrokeWidth={14 / zoom}
                         fill={ACCENT}
                         stroke="#ffffff"
                         strokeWidth={2.5 / zoom}
@@ -1367,14 +1447,33 @@ export default function CanvasStage({
                       <Circle
                         x={selected.x + selected.points[4]}
                         y={selected.y + selected.points[5]}
-                        radius={7 / zoom}
+                        radius={8 / zoom}
+                        hitStrokeWidth={14 / zoom}
                         fill="#ffffff"
                         stroke={ACCENT}
                         strokeWidth={2.5 / zoom}
                         draggable
                         onDragMove={(e) => {
-                          const nx = Math.round(e.target.x() - selected.x);
-                          const ny = Math.round(e.target.y() - selected.y);
+                          const rawX = e.target.x();
+                          const rawY = e.target.y();
+                          const startX = selected.x;
+                          const startY = selected.y;
+                          const snapped = snapToRightAngle(
+                            { x: startX, y: startY },
+                            { x: rawX, y: rawY },
+                            { enabled: snapRightAngles, shiftKey: e.evt.shiftKey },
+                          );
+                          const nx = Math.round(snapped.x - startX);
+                          const ny = Math.round(snapped.y - startY);
+                          e.target.x(startX + nx);
+                          e.target.y(startY + ny);
+                          if (snapped.snapped === "horizontal") {
+                            setGuides({ vertical: [], horizontal: [startY] });
+                          } else if (snapped.snapped === "vertical") {
+                            setGuides({ vertical: [startX], horizontal: [] });
+                          } else {
+                            setGuides(null);
+                          }
                           patch(
                             selected.id,
                             {
@@ -1383,6 +1482,7 @@ export default function CanvasStage({
                             "curve-handle",
                           );
                         }}
+                        onDragEnd={() => setGuides(null)}
                       />
                     </Group>
                   )}
@@ -1638,12 +1738,20 @@ export default function CanvasStage({
                     return [allLocked ? "Unlock" : "Lock", "", () => patchEach(selectedIds, { locked: !allLocked })] as MenuItem;
                   })(),
                   ["Hide", "", () => patchEach(selectedIds, { visible: false })],
+                  ...(isOnlyLine
+                    ? ([
+                        null,
+                        [snapRightAngles ? "✓ Snap right angles (90°)" : "Snap right angles (90°)", "", () => setSnapRightAngles((s) => !s)],
+                      ] as MenuItem[])
+                    : []),
                 ]
               : [
                   ["Paste", "Ctrl+V", clipboard.length ? paste : null],
                   ["Select all", "Ctrl+A", canvas.layers.length ? selectAll : null],
                   ["Fit page to screen", "Ctrl+0", zoomFit],
                   ["Re-centre at current size", "", recenter],
+                  null,
+                  [snapRightAngles ? "✓ Snap right angles (90°)" : "Snap right angles (90°)", "", () => setSnapRightAngles((s) => !s)],
                 ]
           }
           onClose={() => setMenu(null)}

@@ -53,6 +53,8 @@ export type Editor = {
   removing: boolean;
   activeTool: "select" | "line" | "curve";
   setActiveTool: (tool: "select" | "line" | "curve") => void;
+  snapRightAngles: boolean;
+  setSnapRightAngles: (snap: boolean | ((prev: boolean) => boolean)) => void;
 };
 
 export const DRAG_MIME = "application/x-hamper-image";

@@ -20,6 +20,7 @@ import {
   record,
   redo,
   snap,
+  snapToRightAngle,
   startHistory,
   undo,
 } from "./hamper-canvas.ts";
@@ -213,13 +214,60 @@ test("layerConfig and parseCanvas: line and curve layers", () => {
   assert.equal(lineCfg.shape, "Line");
   assert.equal(lineCfg.attrs.stroke, "#2c332f");
   assert.equal(lineCfg.attrs.strokeWidth, 4);
+  assert.equal(lineCfg.attrs.hitStrokeWidth, 28);
   assert.deepEqual(lineCfg.attrs.points, [0, 0, 200, 100]);
 
   const curveCfg = layerConfig(parsed.layers[1]);
   assert.equal(curveCfg.shape, "Line");
   assert.equal(curveCfg.attrs.stroke, "#54655b");
   assert.equal(curveCfg.attrs.strokeWidth, 6);
+  assert.equal(curveCfg.attrs.hitStrokeWidth, 28);
   assert.equal(curveCfg.attrs.bezier, true);
   assert.deepEqual(curveCfg.attrs.points, [0, 0, 100, -50, 200, 0]);
+});
+
+test("snapToRightAngle snaps close to horizontal and vertical lines", () => {
+  const origin = { x: 100, y: 100 };
+
+  // Near horizontal (dy = 5, dx = 200) -> snaps to y = 100
+  const nearHoriz = snapToRightAngle(origin, { x: 300, y: 105 });
+  assert.equal(nearHoriz.snapped, "horizontal");
+  assert.equal(nearHoriz.y, 100);
+  assert.equal(nearHoriz.x, 300);
+
+  // Near horizontal moving left (dx = -250, dy = -4) -> snaps to y = 100
+  const nearHorizLeft = snapToRightAngle(origin, { x: -150, y: 96 });
+  assert.equal(nearHorizLeft.snapped, "horizontal");
+  assert.equal(nearHorizLeft.y, 100);
+  assert.equal(nearHorizLeft.x, -150);
+
+  // Near vertical (dx = 6, dy = 300) -> snaps to x = 100
+  const nearVert = snapToRightAngle(origin, { x: 106, y: 400 });
+  assert.equal(nearVert.snapped, "vertical");
+  assert.equal(nearVert.x, 100);
+  assert.equal(nearVert.y, 400);
+
+  // Near vertical moving up (dx = -5, dy = -200) -> snaps to x = 100
+  const nearVertUp = snapToRightAngle(origin, { x: 95, y: -100 });
+  assert.equal(nearVertUp.snapped, "vertical");
+  assert.equal(nearVertUp.x, 100);
+  assert.equal(nearVertUp.y, -100);
+
+  // Clear diagonal / freeform angle -> does not snap
+  const freeform = snapToRightAngle(origin, { x: 250, y: 200 });
+  assert.equal(freeform.snapped, null);
+  assert.equal(freeform.x, 250);
+  assert.equal(freeform.y, 200);
+
+  // Disabled snap option -> preserves raw target
+  const disabled = snapToRightAngle(origin, { x: 300, y: 105 }, { enabled: false });
+  assert.equal(disabled.snapped, null);
+  assert.equal(disabled.y, 105);
+
+  // Shift key -> snaps to nearest 45° step
+  const shiftDiagonal = snapToRightAngle(origin, { x: 200, y: 195 }, { shiftKey: true });
+  assert.equal(shiftDiagonal.snapped, "diagonal");
+  // At 45°, nx - 100 === ny - 100
+  assert.equal(shiftDiagonal.x - origin.x, shiftDiagonal.y - origin.y);
 });
 
