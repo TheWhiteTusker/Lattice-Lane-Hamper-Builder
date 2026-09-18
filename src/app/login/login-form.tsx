@@ -46,7 +46,10 @@ export function LoginForm() {
         return;
       }
     } else {
-      const { error } = await supabase.auth.signInWithPassword({ email, password });
+      const { error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
       if (error) {
         setError(error.message);
         setBusy(false);
@@ -121,7 +124,9 @@ export function LoginForm() {
               onChange={(e) => setPassword(e.target.value)}
               required
               minLength={8}
-              autoComplete={mode === "signup" ? "new-password" : "current-password"}
+              autoComplete={
+                mode === "signup" ? "new-password" : "current-password"
+              }
             />
           </div>
 
@@ -133,7 +138,11 @@ export function LoginForm() {
           {notice && <p className="text-sm text-green-800">{notice}</p>}
 
           <button type="submit" className="btn-primary w-full" disabled={busy}>
-            {busy ? "Working…" : mode === "signin" ? "Sign in" : "Create account"}
+            {busy
+              ? "Working…"
+              : mode === "signin"
+                ? "Sign in"
+                : "Create account"}
           </button>
         </form>
 

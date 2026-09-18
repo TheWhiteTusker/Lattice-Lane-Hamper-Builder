@@ -19,7 +19,7 @@ export function Nav({ profile, desktop }: { profile: Profile; desktop: boolean }
   const links = [
     { href: "/", label: "Dashboard" },
     { href: "/hampers", label: "Hampers" },
-    { href: "/presentations", label: "Presentations" },
+    // { href: "/presentations", label: "Presentations" },
     { href: "/quotes", label: "Quotes" },
     { href: "/clients", label: "Clients" },
     { href: "/products", label: "Products" },
