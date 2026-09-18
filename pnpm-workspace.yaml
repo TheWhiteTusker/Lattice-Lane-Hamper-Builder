@@ -11,14 +11,20 @@ packages:
 #   workerd        the Cloudflare Workers runtime, via wrangler
 # pnpm renamed this setting between majors, so both spellings are present and
 # whichever pnpm runs will find one of them.
-onlyBuiltDependencies: # pnpm 10
+onlyBuiltDependencies:
+  # pnpm 10
   - unrs-resolver
   - esbuild
   - workerd
-allowBuilds: # pnpm 11
+  - electron
+  - electron-winstaller
+allowBuilds:
+  # pnpm 11
   unrs-resolver: true
   esbuild: true
   workerd: true
+  electron: true
+  electron-winstaller: true
 
 # Flat node_modules. OpenNext's bundler symlinks pnpm's nested layout while
 # tracing files, which Windows refuses without elevation (EPERM), so

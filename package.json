@@ -1,7 +1,7 @@
 {
   "name": "lattice-lane",
   "version": "0.1.0",
-  "private": true,
+  "main": "electron/main.cjs",
   "scripts": {
     "dev": "next dev -p 3015",
     "build": "next build",
@@ -9,6 +9,7 @@
     "lint": "eslint",
     "test": "node --test \"src/**/*.test.ts\"",
     "typecheck": "tsc --noEmit",
+    "build:desktop": "node scripts/build-desktop.mjs",
     "cf:build": "opennextjs-cloudflare build",
     "cf:deploy": "opennextjs-cloudflare deploy",
     "cf:preview": "opennextjs-cloudflare preview"
@@ -34,11 +35,63 @@
     "@types/papaparse": "^5.5.2",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "cross-env": "^10.1.0",
+    "electron": "^44.4.1",
+    "electron-builder": "^26.15.3",
     "eslint": "^9",
     "eslint-config-next": "16.3.4",
     "tailwindcss": "^4",
     "typescript": "^5",
     "wrangler": "^4.129.0"
   },
-  "packageManager": "pnpm@11.9.0"
+  "packageManager": "pnpm@11.9.0",
+  "build": {
+    "appId": "com.latticelane.hamperbuilder",
+    "productName": "Lattice Lane",
+    "directories": {
+      "output": "dist"
+    },
+    "asar": true,
+    "asarUnpack": [
+      "standalone/**/*"
+    ],
+    "files": [
+      "electron/**/*",
+      "build/icon.ico",
+      {
+        "from": ".next/standalone",
+        "to": "standalone",
+        "filter": [
+          "**/*"
+        ]
+      }
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "build/icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Lattice Lane"
+    },
+    "portable": {
+      "artifactName": "Lattice-Lane-Portable.exe"
+    }
+  }
 }
