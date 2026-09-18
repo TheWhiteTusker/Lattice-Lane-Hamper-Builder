@@ -73,7 +73,7 @@ export function Nav({ profile, desktop }: { profile: Profile; desktop: boolean }
           {!desktop && (
             // Plain <a>: a file download, not a page for the router to prefetch.
             <a
-              href="/download"
+              href="/updates/Lattice-Lane-Setup.exe"
               className="btn rounded-full border border-white/30 text-white hover:bg-white/10"
             >
               Download app

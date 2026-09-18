@@ -1,6 +1,6 @@
 {
   "name": "lattice-lane",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "main": "electron/main.cjs",
   "scripts": {
     "dev": "next dev -p 3015",
@@ -10,7 +10,7 @@
     "test": "node --test \"src/**/*.test.ts\"",
     "typecheck": "tsc --noEmit",
     "build:desktop": "node scripts/build-desktop.mjs",
-    "publish:desktop": "wrangler r2 object put lattice-lane-downloads/Lattice-Lane-Setup.exe --file \"dist/Lattice Lane Setup 0.1.0.exe\" --content-type application/octet-stream --remote",
+    "publish:desktop": "wrangler r2 object put lattice-lane-downloads/Lattice-Lane-Setup.exe --file dist/Lattice-Lane-Setup.exe --content-type application/octet-stream --remote && wrangler r2 object put lattice-lane-downloads/latest.json --file dist/latest.json --content-type application/json --remote",
     "cf:build": "opennextjs-cloudflare build",
     "cf:deploy": "opennextjs-cloudflare deploy",
     "cf:preview": "opennextjs-cloudflare preview"
@@ -73,7 +73,8 @@
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "shortcutName": "Lattice Lane"
+      "shortcutName": "Lattice Lane",
+      "artifactName": "Lattice-Lane-Setup.exe"
     },
     "extraResources": [
       {

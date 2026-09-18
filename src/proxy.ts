@@ -50,7 +50,8 @@ export async function proxy(request: NextRequest) {
   const user = data?.claims;
 
   const path = request.nextUrl.pathname;
-  const isPublic = path.startsWith("/login") || path.startsWith("/auth");
+  const isPublic =
+    path.startsWith("/login") || path.startsWith("/auth") || path.startsWith("/updates");
 
   if (!user && !isPublic) {
     const url = request.nextUrl.clone();

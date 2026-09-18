@@ -36,3 +36,8 @@ console.log("✓ Standalone server ready");
 console.log("\n=== [4/4] Packaging Windows installer with electron-builder ===");
 execSync("pnpm exec electron-builder --win", { cwd: ROOT, stdio: "inherit" });
 console.log("\n✨ Done. Installer is in dist/.");
+
+// The installed app compares its version with this on launch (electron/main.cjs).
+const { version } = JSON.parse(fs.readFileSync(path.join(ROOT, "package.json"), "utf8"));
+fs.writeFileSync(path.join(ROOT, "dist", "latest.json"), JSON.stringify({ version }));
+console.log(`Version ${version}. Run \`pnpm publish:desktop\` to release it.`);

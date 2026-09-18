@@ -1,4 +1,5 @@
-const { app, BrowserWindow, shell, utilityProcess } = require("electron");
+const { app, BrowserWindow, dialog, shell, utilityProcess } = require("electron");
+const { spawn } = require("child_process");
 const path = require("path");
 const http = require("http");
 const net = require("net");
@@ -72,6 +73,50 @@ async function startServer() {
   await waitForServer(appUrl);
 }
 
+// Releases are published to the website (pnpm publish:desktop). On launch the
+// app offers any newer version and installs it silently, so nobody reinstalls
+// by hand.
+const UPDATES = "https://lattice-lane-hamper-builder.digital-9f6.workers.dev/updates/";
+
+const isNewer = (a, b) => {
+  const [x, y] = [a, b].map((v) => v.split(".").map(Number));
+  for (let i = 0; i < 3; i++) if ((x[i] || 0) !== (y[i] || 0)) return (x[i] || 0) > (y[i] || 0);
+  return false;
+};
+
+async function checkForUpdate() {
+  if (!app.isPackaged) return;
+  try {
+    const res = await fetch(UPDATES + "latest.json", { cache: "no-store" });
+    if (!res.ok) return;
+    const { version } = await res.json();
+    if (!isNewer(version, app.getVersion())) return;
+
+    const { response } = await dialog.showMessageBox(mainWindow, {
+      type: "info",
+      buttons: ["Update now", "Later"],
+      title: "Update available",
+      message: `Lattice Lane ${version} is available (you have ${app.getVersion()}).`,
+      detail: "It downloads in the background, then the app restarts on the new version.",
+    });
+    if (response !== 0) return;
+
+    mainWindow?.setProgressBar(2); // indeterminate, on the taskbar icon
+    const exe = await fetch(UPDATES + "Lattice-Lane-Setup.exe");
+    if (!exe.ok) throw new Error(`Download failed (${exe.status})`);
+    const file = path.join(app.getPath("temp"), "Lattice-Lane-Setup.exe");
+    fs.writeFileSync(file, Buffer.from(await exe.arrayBuffer()));
+
+    // Silent install over the existing one, then relaunch.
+    spawn(file, ["/S", "--force-run"], { detached: true, stdio: "ignore" }).unref();
+    app.quit();
+  } catch (error) {
+    // Offline or a bad download: keep working, try again next launch.
+    mainWindow?.setProgressBar(-1);
+    console.error("Update check failed:", error);
+  }
+}
+
 function createWindow() {
   const ico = path.join(__dirname, "..", "build", "icon.ico");
   mainWindow = new BrowserWindow({
@@ -131,6 +176,7 @@ if (!app.requestSingleInstanceLock()) {
     try {
       await startServer();
       mainWindow?.loadURL(appUrl);
+      checkForUpdate();
     } catch (error) {
       mainWindow?.loadURL(page("Lattice Lane - Error", `<h2>Could not start</h2><p>${error.message}</p>`));
     }
