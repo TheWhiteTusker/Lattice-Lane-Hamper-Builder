@@ -38,6 +38,11 @@ body {
   color: var(--color-ink);
 }
 
+::selection {
+  background-color: var(--color-brand);
+  color: #ffffff;
+}
+
 /* Back-to-top: anchor link, not a JS scroll handler. Sizing and shadow follow
    the Framer BackToTop component; the blue is swapped for the brand sage. It
    appears after a fixed 200px, not a % of the page, so long lists like the

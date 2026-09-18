@@ -15,6 +15,8 @@ const eslintConfig = defineConfig([
     // Build artifacts:
     ".open-next/**",
     ".wrangler/**",
+    "dist/**",
+    "electron/**",
     // Archived copy of the Google Apps Script this app replaces.
     "docs/**",
   ]),

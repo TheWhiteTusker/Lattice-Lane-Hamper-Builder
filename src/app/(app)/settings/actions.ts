@@ -75,6 +75,70 @@ export async function saveList(
   return saveSetting(key, values);
 }
 
+/** Add a single item to a pick-list in app_settings. */
+export async function addPickListItem(
+  key: string,
+  rawItem: string,
+): Promise<ActionState & { values?: string[] }> {
+  const trimmed = rawItem.trim();
+  if (!key) return { error: "Missing list key." };
+  if (!trimmed) return { error: "Item name cannot be empty." };
+
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("app_settings")
+    .select("value")
+    .eq("key", key)
+    .maybeSingle();
+
+  if (error) return { error: describeError(error) };
+
+  const current: string[] = Array.isArray(data?.value) ? (data.value as string[]) : [];
+  if (current.some((v) => v.toLowerCase() === trimmed.toLowerCase())) {
+    return { error: `"${trimmed}" already exists in this pick-list.` };
+  }
+
+  const updated = [...current, trimmed];
+  const res = await saveSetting(key, updated);
+  if (res.error) return res;
+
+  return { ok: true, values: updated };
+}
+
+/** Remove a single item from a pick-list in app_settings. */
+export async function removePickListItem(
+  key: string,
+  item: string,
+): Promise<ActionState & { values?: string[] }> {
+  if (!key) return { error: "Missing list key." };
+
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("app_settings")
+    .select("value")
+    .eq("key", key)
+    .maybeSingle();
+
+  if (error) return { error: describeError(error) };
+
+  const current: string[] = Array.isArray(data?.value) ? (data.value as string[]) : [];
+  const updated = current.filter((v) => v !== item);
+  const res = await saveSetting(key, updated);
+  if (res.error) return res;
+
+  return { ok: true, values: updated };
+}
+
+/** Persist an entire list of values for a pick-list key. */
+export async function setPickListValues(
+  key: string,
+  values: string[],
+): Promise<ActionState> {
+  if (!key) return { error: "Missing list key." };
+  const cleaned = values.map((v) => v.trim()).filter(Boolean);
+  return saveSetting(key, cleaned);
+}
+
 export async function saveDefault(
   _prev: ActionState,
   formData: FormData,

@@ -5,13 +5,13 @@ import { PageHeader } from "@/components/ui";
 import {
   CompanyForm,
   TermsForm,
-  ListForm,
   DefaultForm,
   CategoryRow,
   AddCategoryForm,
   UserRoleForm,
   UpdateAppButton,
 } from "./forms";
+import { PickListManager } from "./pick-list-manager";
 import type { Category, Profile } from "@/lib/types";
 
 export default async function SettingsPage() {
@@ -87,71 +87,37 @@ export default async function SettingsPage() {
       <section className="card mt-4 p-4">
         <h2 className="text-sm font-semibold">Pick-lists</h2>
         <p className="mt-0.5 text-xs text-[var(--color-muted)]">
-          One value per line. These fill the dropdowns across the app.
+          Manage the standard options that fill dropdowns across the app.
         </p>
 
-        <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-          <ListForm
-            settingKey="hamper_statuses"
-            label="Hamper statuses"
-            values={settings.hamper_statuses}
-          />
-          <ListForm
-            settingKey="quote_statuses"
-            label="Quotation statuses"
-            hint="Only managers can move a quotation between these."
-            values={settings.quote_statuses}
-          />
-          <ListForm
-            settingKey="quote_structures"
-            label="Quote structures"
-            hint='Only "Combined Order" produces an order total.'
-            values={settings.quote_structures}
-          />
-          <ListForm
-            settingKey="collections"
-            label="Collections / occasions"
-            values={settings.collections}
-          />
-          <ListForm settingKey="sources" label="Sources / vendors" values={settings.sources} />
-          <ListForm
-            settingKey="validity_options"
-            label="Validity options"
-            values={settings.validity_options}
-          />
-          <ListForm
-            settingKey="detail_modes"
-            label="Contents shown on a quotation"
-            hint='Anything containing "hide" hides contents, "summary" prints a count.'
-            values={settings.detail_modes}
-          />
-          <ListForm
-            settingKey="packaging_treatments"
-            label="Packaging treatments"
-            hint='Anything containing "absorb" folds packaging into the hamper.'
-            values={settings.packaging_treatments}
-          />
+        <div className="mt-4">
+          <PickListManager settings={settings} />
         </div>
 
-        <div className="mt-4 grid gap-3 md:grid-cols-3">
-          <DefaultForm
-            settingKey="default_detail_mode"
-            label="Default contents setting"
-            value={settings.default_detail_mode}
-            options={settings.detail_modes}
-          />
-          <DefaultForm
-            settingKey="default_packaging_treatment"
-            label="Default packaging treatment"
-            value={settings.default_packaging_treatment}
-            options={settings.packaging_treatments}
-          />
-          <DefaultForm
-            settingKey="default_validity"
-            label="Default validity"
-            value={settings.default_validity}
-            options={settings.validity_options}
-          />
+        <div className="mt-6 border-t border-[var(--color-line)] pt-4">
+          <h3 className="text-xs font-semibold uppercase tracking-wider text-[var(--color-muted)]">
+            Default Selections
+          </h3>
+          <div className="mt-3 grid gap-3 md:grid-cols-3">
+            <DefaultForm
+              settingKey="default_detail_mode"
+              label="Default contents setting"
+              value={settings.default_detail_mode}
+              options={settings.detail_modes}
+            />
+            <DefaultForm
+              settingKey="default_packaging_treatment"
+              label="Default packaging treatment"
+              value={settings.default_packaging_treatment}
+              options={settings.packaging_treatments}
+            />
+            <DefaultForm
+              settingKey="default_validity"
+              label="Default validity"
+              value={settings.default_validity}
+              options={settings.validity_options}
+            />
+          </div>
         </div>
       </section>
 
