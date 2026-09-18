@@ -285,16 +285,16 @@ export function PickListManager({ settings }: { settings: Settings }) {
                           setSearch("");
                           setIsDropdownOpen(false);
                         }}
-                        className={`flex w-full select-none items-center justify-between px-3 py-2 text-left text-sm font-medium cursor-pointer ${
-                          isSelected
-                            ? "bg-[var(--color-brand)] text-white"
-                            : "text-[var(--color-ink)] hover:bg-[var(--color-brand)] hover:text-white"
+                        className={`group flex w-full select-none items-center justify-between px-3 py-2 text-left text-sm cursor-pointer text-[var(--color-ink)] hover:bg-[var(--color-brand)] hover:text-white focus:bg-[var(--color-brand)] focus:text-white focus:outline-none ${
+                          isSelected ? "font-semibold" : "font-medium"
                         }`}
                       >
                         <span className="truncate">
                           {config.label} ({count} {count === 1 ? "value" : "values"})
                         </span>
-                        {isSelected && <Check className="h-4 w-4 shrink-0 text-white" />}
+                        {isSelected && (
+                          <Check className="h-4 w-4 shrink-0 text-[var(--color-brand)] group-hover:text-white group-focus:text-white" />
+                        )}
                       </button>
                     );
                   })}
