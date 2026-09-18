@@ -51,20 +51,9 @@
     "directories": {
       "output": "dist"
     },
-    "asar": true,
-    "asarUnpack": [
-      "standalone/**/*"
-    ],
     "files": [
       "electron/**/*",
-      "build/icon.ico",
-      {
-        "from": ".next/standalone",
-        "to": "standalone",
-        "filter": [
-          "**/*"
-        ]
-      }
+      "build/icon.ico"
     ],
     "win": {
       "target": [

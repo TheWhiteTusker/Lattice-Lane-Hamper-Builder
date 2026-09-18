@@ -1,100 +1,19 @@
-const { app, BrowserWindow, utilityProcess } = require("electron");
+const { app, BrowserWindow, shell, session, Menu } = require("electron");
 const path = require("path");
-const http = require("http");
-const net = require("net");
 const fs = require("fs");
 
+const DEFAULT_URL = "https://lattice-lane-hamper-builder.digital-9f6.workers.dev";
+const TARGET_URL = process.env.LATTICE_LANE_URL || DEFAULT_URL;
+
 let mainWindow = null;
-let serverProcess = null;
 
-// Find an available TCP port on localhost
-function getAvailablePort() {
-  return new Promise((resolve, reject) => {
-    const server = net.createServer();
-    server.listen(0, "127.0.0.1", () => {
-      const port = server.address().port;
-      server.close(() => resolve(port));
-    });
-    server.on("error", reject);
-  });
-}
-
-// Check if HTTP server is responsive
-function waitForServer(url, timeoutMs = 30000) {
-  const startTime = Date.now();
-  return new Promise((resolve, reject) => {
-    const interval = setInterval(() => {
-      http
-        .get(url, (res) => {
-          clearInterval(interval);
-          resolve(true);
-        })
-        .on("error", () => {
-          if (Date.now() - startTime > timeoutMs) {
-            clearInterval(interval);
-            reject(new Error("Timeout waiting for internal server to start"));
-          }
-        });
-    }, 150);
-  });
-}
-
-// Locate Next.js standalone server.js
-function getServerPath() {
-  const possiblePaths = [
-    path.join(app.getAppPath(), "standalone", "server.js"),
-    path.join(app.getAppPath(), ".next", "standalone", "server.js"),
-    path.join(process.resourcesPath, "standalone", "server.js"),
-    path.join(process.resourcesPath, "app", "standalone", "server.js"),
-    path.join(process.resourcesPath, "app", ".next", "standalone", "server.js"),
-    path.join(__dirname, "..", ".next", "standalone", "server.js"),
-  ];
-
-  for (const p of possiblePaths) {
-    if (fs.existsSync(p)) {
-      return p;
-    }
-  }
-  throw new Error("Could not find Next.js standalone server.js. Checked: " + possiblePaths.join(", "));
-}
-
-async function startApp() {
-  const port = await getAvailablePort();
-  const serverScript = getServerPath();
-  const serverDir = path.dirname(serverScript);
-
-  console.log(`[Lattice Lane Desktop] Starting server on port ${port}...`);
-  console.log(`[Lattice Lane Desktop] Server script: ${serverScript}`);
-
-  const serverEnv = {
-    ...process.env,
-    PORT: String(port),
-    HOSTNAME: "127.0.0.1",
-    NODE_ENV: "production",
-  };
-
-  // Launch Next.js standalone server using Electron's utilityProcess
-  serverProcess = utilityProcess.fork(serverScript, [], {
-    cwd: serverDir,
-    env: serverEnv,
-  });
-
-  serverProcess.on("exit", (code) => {
-    console.log(`[Lattice Lane Desktop] Server exited with code ${code}`);
-    if (mainWindow && !mainWindow.isDestroyed()) {
-      mainWindow.close();
-    }
-  });
-
-  const appUrl = `http://127.0.0.1:${port}`;
-  await waitForServer(appUrl);
-
+function createWindow() {
   const iconPath = fs.existsSync(path.join(__dirname, "..", "build", "icon.ico"))
     ? path.join(__dirname, "..", "build", "icon.ico")
     : path.join(__dirname, "..", "src", "app", "icon.png");
 
   mainWindow = new BrowserWindow({
-    width: 1400,
+    width: 1440,
     height: 900,
     minWidth: 1024,
     minHeight: 700,
@@ -105,39 +24,106 @@ async function startApp() {
       preload: path.join(__dirname, "preload.cjs"),
       contextIsolation: true,
       nodeIntegration: false,
+      spellcheck: true,
     },
   });
 
-  mainWindow.loadURL(appUrl);
+  // External links open in default web browser
+  mainWindow.webContents.setWindowOpenHandler(({ url }) => {
+    if (!url.startsWith(TARGET_URL) && !url.includes("supabase.co")) {
+      shell.openExternal(url);
+      return { action: "deny" };
+    }
+    return { action: "allow" };
+  });
+
+  // Load the live cloud app
+  mainWindow.loadURL(TARGET_URL);
+
+  // Friendly retry page if offline or connection drops
+  mainWindow.webContents.on("did-fail-load", (event, errorCode, errorDescription, validatedURL) => {
+    if (errorCode === -3) return; // Ignore user abort / redirects
+
+    mainWindow.loadURL(`data:text/html;charset=utf-8,
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>Lattice Lane - Offline</title>
+          <style>
+            body {
+              font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+              display: flex;
+              flex-direction: column;
+              align-items: center;
+              justify-content: center;
+              height: 100vh;
+              margin: 0;
+              background-color: #faf9f6;
+              color: #2c332d;
+            }
+            .card {
+              background: white;
+              padding: 40px;
+              border-radius: 12px;
+              box-shadow: 0 4px 20px rgba(0,0,0,0.06);
+              text-align: center;
+              max-width: 420px;
+            }
+            h2 { margin-top: 0; color: #54655b; }
+            p { color: #666; font-size: 14px; line-height: 1.5; }
+            button {
+              background: #54655b;
+              color: white;
+              border: none;
+              padding: 10px 24px;
+              font-size: 14px;
+              font-weight: 600;
+              border-radius: 6px;
+              cursor: pointer;
+              margin-top: 16px;
+            }
+            button:hover { background: #44534a; }
+          </style>
+        </head>
+        <body>
+          <div class="card">
+            <h2>Connection Unavailable</h2>
+            <p>Could not connect to Lattice Lane. Please check your internet connection and try again.</p>
+            <button onclick="window.location.href='${TARGET_URL}'">Retry Connection</button>
+          </div>
+        </body>
+      </html>
+    `);
+  });
 
   mainWindow.on("closed", () => {
     mainWindow = null;
   });
 }
 
-function cleanUp() {
-  if (serverProcess) {
-    try {
-      serverProcess.kill();
-    } catch {
-      // ignore
-    }
-    serverProcess = null;
-  }
-}
-
-app.whenReady().then(startApp).catch((err) => {
-  console.error("[Lattice Lane Desktop] Failed to start:", err);
-  cleanUp();
+// Ensure single instance running
+const gotTheLock = app.requestSingleInstanceLock();
+if (!gotTheLock) {
   app.quit();
-});
+} else {
+  app.on("second-instance", () => {
+    if (mainWindow) {
+      if (mainWindow.isMinimized()) mainWindow.restore();
+      mainWindow.focus();
+    }
+  });
 
-app.on("window-all-closed", () => {
-  cleanUp();
-  if (process.platform !== "darwin") {
-    app.quit();
-  }
-});
+  app.whenReady().then(createWindow);
 
-app.on("before-quit", cleanUp);
-app.on("will-quit", cleanUp);
+  app.on("window-all-closed", () => {
+    if (process.platform !== "darwin") {
+      app.quit();
+    }
+  });
+
+  app.on("activate", () => {
+    if (BrowserWindow.getAllWindows().length === 0) {
+      createWindow();
+    }
+  });
+}
