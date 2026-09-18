@@ -8,6 +8,7 @@ import {
   saveCategory,
   deleteCategory,
   setUserRole,
+  publishDesktopApp,
 } from "./actions";
 import type { ActionState } from "@/lib/forms";
 import type { Category, CompanySettings, Profile, UserRole } from "@/lib/types";
@@ -423,5 +424,32 @@ export function UserRoleForm({ profile, isSelf }: { profile: Profile; isSelf: bo
         </form>
       </td>
     </tr>
+  );
+}
+
+export function UpdateAppButton() {
+  const [state, action, pending] = useActionState(publishDesktopApp, {});
+
+  return (
+    <form action={action} className="flex items-center gap-3">
+      <button type="submit" className="btn-secondary" disabled={pending || state.ok}>
+        {pending ? "Starting…" : "Update the app"}
+      </button>
+      {state.error && (
+        <span role="alert" className="text-sm text-red-700">
+          {state.error}
+        </span>
+      )}
+      {state.ok && (
+        <a
+          href="https://github.com/TheWhiteTusker/Lattice-Lane-Hamper-Builder/actions/workflows/desktop.yml"
+          target="_blank"
+          rel="noreferrer"
+          className="text-sm text-green-800 underline"
+        >
+          Building (~10 min), then everyone&rsquo;s app offers the update
+        </a>
+      )}
+    </form>
   );
 }

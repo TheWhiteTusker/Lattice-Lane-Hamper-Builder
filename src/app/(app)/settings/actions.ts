@@ -2,7 +2,8 @@
 
 import { z } from "zod";
 import { revalidatePath } from "next/cache";
-import { createClient } from "@/lib/supabase/server";
+import { getCloudflareContext } from "@opennextjs/cloudflare";
+import { createClient, requireRole } from "@/lib/supabase/server";
 import { type ActionState, checkbox, describeError, percent } from "@/lib/forms";
 import { deriveCategoryCode } from "@/lib/product-code";
 
@@ -169,5 +170,44 @@ export async function setUserRole(
   if (error) return { error: describeError(error) };
 
   revalidatePath("/settings");
+  return { ok: true };
+}
+
+// ---------------------------------------------------------------
+// DESKTOP APP
+// ---------------------------------------------------------------
+
+/**
+ * Starts .github/workflows/desktop.yml, which builds the Windows app from main
+ * and publishes it; installed apps then offer "Update now" on their next launch.
+ * Needs the Worker secret GITHUB_TOKEN: a fine-grained token for this repo
+ * with Actions: Read and write.
+ */
+export async function publishDesktopApp(): Promise<ActionState> {
+  await requireRole("admin");
+
+  let token = process.env.GITHUB_TOKEN;
+  try {
+    const { env } = await getCloudflareContext({ async: true });
+    token ??= (env as unknown as { GITHUB_TOKEN?: string }).GITHUB_TOKEN;
+  } catch {
+    // Not on Cloudflare (desktop app, local dev): process.env only.
+  }
+  if (!token) return { error: "GITHUB_TOKEN is not set on the website." };
+
+  const res = await fetch(
+    "https://api.github.com/repos/TheWhiteTusker/Lattice-Lane-Hamper-Builder/actions/workflows/desktop.yml/dispatches",
+    {
+      method: "POST",
+      headers: {
+        authorization: `Bearer ${token}`,
+        accept: "application/vnd.github+json",
+        "user-agent": "lattice-lane",
+      },
+      body: JSON.stringify({ ref: "main" }),
+    },
+  );
+  if (!res.ok) return { error: `GitHub refused (${res.status}): ${await res.text()}` };
+
   return { ok: true };
 }

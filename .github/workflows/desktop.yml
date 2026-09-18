@@ -1,25 +1,18 @@
-# Builds and publishes the Windows desktop app on every push to main that
-# changes app code. Installed apps see the new version on their next launch
+# Builds the Windows desktop app from main and publishes it. Installed apps
+# see the new version on their next launch
 # and offer "Update now" (electron/main.cjs). The website deploys separately,
 # through Cloudflare Workers Builds.
 #
 # Needs one repo secret: CLOUDFLARE_API_TOKEN, with Workers R2 Storage: Edit.
+# The website needs GITHUB_TOKEN to start it (see publishDesktopApp).
 name: Desktop app
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - "src/**"
-      - "public/**"
-      - "electron/**"
-      - "next.config.ts"
-      - "package.json"
-      - "pnpm-lock.yaml"
-      - "scripts/build-desktop.mjs"
+  # Started by the "Update the app" button on the website's Settings page,
+  # or by hand from the repo's Actions tab.
   workflow_dispatch:
 
-# A newer push supersedes a build still in progress.
+# A second click supersedes a build still in progress.
 concurrency:
   group: desktop
   cancel-in-progress: true

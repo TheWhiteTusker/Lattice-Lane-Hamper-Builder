@@ -10,6 +10,7 @@ import {
   CategoryRow,
   AddCategoryForm,
   UserRoleForm,
+  UpdateAppButton,
 } from "./forms";
 import type { Category, Profile } from "@/lib/types";
 
@@ -33,6 +34,7 @@ export default async function SettingsPage() {
         <Link href="/admin/refresh-prices" className="btn-secondary">
           Refresh prices
         </Link>
+        <UpdateAppButton />
       </PageHeader>
 
       <div className="grid gap-4 lg:grid-cols-2">
