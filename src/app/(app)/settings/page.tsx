@@ -13,6 +13,7 @@ import {
 } from "./forms";
 import { PickListManager } from "./pick-list-manager";
 import type { Category, Profile } from "@/lib/types";
+import { APP_VERSION } from "@/lib/version";
 
 export default async function SettingsPage() {
   const { supabase, profile } = await requireRole("admin");
@@ -146,6 +147,16 @@ export default async function SettingsPage() {
           </tbody>
         </table>
       </section>
+
+      {/* ---------------- app version footer ---------------- */}
+      <footer className="mt-8 mb-4 border-t border-[var(--color-line)] pt-6 text-center text-xs text-[var(--color-muted)]">
+        <p className="font-semibold text-[var(--color-ink)]">
+          Lattice Lane Hamper Builder
+        </p>
+        <p className="mt-1">
+          Version <span className="font-mono font-medium text-[var(--color-brand)]">v{APP_VERSION}</span>
+        </p>
+      </footer>
     </>
   );
 }

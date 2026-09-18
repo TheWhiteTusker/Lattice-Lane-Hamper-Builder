@@ -13,6 +13,7 @@ import {
 import type { ActionState } from "@/lib/forms";
 import type { Category, CompanySettings, Profile, UserRole } from "@/lib/types";
 import { round2 } from "@/lib/pricing";
+import { APP_VERSION } from "@/lib/version";
 
 function Status({ state }: { state: ActionState }) {
   if (state.error)
@@ -429,7 +430,10 @@ export function UpdateAppButton() {
   const [state, action, pending] = useActionState(publishDesktopApp, {});
 
   return (
-    <form action={action} className="flex items-center gap-3">
+    <form action={action} className="flex items-center gap-2.5">
+      <span className="rounded bg-slate-100 px-2 py-1 font-mono text-xs font-semibold text-[var(--color-muted)]">
+        v{APP_VERSION}
+      </span>
       <button type="submit" className="btn-secondary" disabled={pending || state.ok}>
         {pending ? "Starting…" : "Update the app"}
       </button>
