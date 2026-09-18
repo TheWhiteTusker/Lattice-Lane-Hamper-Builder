@@ -14,15 +14,13 @@ import type { ActionState } from "@/lib/forms";
 import type { Category, CompanySettings, Profile, UserRole } from "@/lib/types";
 import { round2 } from "@/lib/pricing";
 
-function Status({ state, pending }: { state: ActionState; pending: boolean }) {
-  if (pending) return <span className="text-sm text-[var(--color-muted)]">Saving…</span>;
+function Status({ state }: { state: ActionState }) {
   if (state.error)
     return (
       <span role="alert" className="text-sm text-red-700">
         {state.error}
       </span>
     );
-  if (state.ok) return <span className="text-sm text-green-800">Saved</span>;
   return null;
 }
 
@@ -168,9 +166,9 @@ export function CompanyForm({
 
       <div className="mt-4 flex items-center gap-3">
         <button type="submit" className="btn-primary" disabled={pending}>
-          Save
+          {pending ? "Saving…" : "Save"}
         </button>
-        <Status state={state} pending={pending} />
+        <Status state={state} />
       </div>
     </form>
   );
@@ -205,9 +203,9 @@ export function TermsForm({
 
       <div className="mt-3 flex items-center gap-3">
         <button type="submit" className="btn-primary" disabled={pending}>
-          Save
+          {pending ? "Saving…" : "Save"}
         </button>
-        <Status state={state} pending={pending} />
+        <Status state={state} />
       </div>
     </form>
   );
@@ -245,9 +243,9 @@ export function ListForm({
 
       <div className="mt-2 flex items-center gap-3">
         <button type="submit" className="btn-secondary" disabled={pending}>
-          Save
+          {pending ? "Saving…" : "Save"}
         </button>
-        <Status state={state} pending={pending} />
+        <Status state={state} />
       </div>
     </form>
   );
@@ -289,9 +287,9 @@ export function DefaultForm({
 
       <div className="mt-2 flex items-center gap-3">
         <button type="submit" className="btn-secondary" disabled={pending}>
-          Save
+          {pending ? "Saving…" : "Save"}
         </button>
-        <Status state={state} pending={pending} />
+        <Status state={state} />
       </div>
     </form>
   );
@@ -335,9 +333,9 @@ export function CategoryRow({ category }: { category: Category }) {
             </label>
 
             <button type="submit" className="btn-secondary" disabled={pending}>
-              Save
+              {pending ? "Saving…" : "Save"}
             </button>
-            <Status state={state} pending={pending} />
+            <Status state={state} />
           </form>
 
           <form action={delAction} className="flex items-center gap-2">
@@ -386,9 +384,9 @@ export function AddCategoryForm({ nextSortOrder }: { nextSortOrder: number }) {
       </label>
 
       <button type="submit" className="btn-primary" disabled={pending}>
-        Add category
+        {pending ? "Adding…" : "Add category"}
       </button>
-      <Status state={state} pending={pending} />
+      <Status state={state} />
     </form>
   );
 }
@@ -418,9 +416,9 @@ export function UserRoleForm({ profile, isSelf }: { profile: Profile; isSelf: bo
             <option value="admin">Admin</option>
           </select>
           <button type="submit" className="btn-secondary" disabled={pending}>
-            Save
+            {pending ? "Saving…" : "Save"}
           </button>
-          <Status state={state} pending={pending} />
+          <Status state={state} />
         </form>
       </td>
     </tr>
