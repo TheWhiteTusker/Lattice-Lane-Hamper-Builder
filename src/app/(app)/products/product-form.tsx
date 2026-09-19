@@ -8,8 +8,10 @@ import {
   formatProductCode,
   parseProductCode,
   STANDARD_PRODUCT_COLORS,
-  COLOR_TO_CODE,
+  colorCode,
+  resolveColors,
   deriveCategoryCode,
+  type ProductColor,
   codesForColors,
 } from "@/lib/product-code";
 import { ProductImagesManager } from "@/components/product-images-manager";
@@ -20,12 +22,13 @@ export function ProductForm({
   initialImages = [],
   categories,
   sources,
+  allColors = resolveColors(STANDARD_PRODUCT_COLORS.map((c) => c.name)),
 }: {
   product?: Product;
   initialImages?: ProductImage[];
   categories: Category[];
   sources: string[];
-  allColors?: string[];
+  allColors?: ProductColor[];
 }) {
   const [state, action, pending] = useActionState(saveProduct, {});
   const [deleteState, deleteAction, deleting] = useActionState(deleteProduct, {});
@@ -75,15 +78,15 @@ export function ProductForm({
     const cat = categories.find((c) => c.id === newCatId);
     const catCode = cat?.code || (cat ? deriveCategoryCode(cat.name) : "LC");
     const currentParsed = parseProductCode(code);
-    const colorCode =
+    const colCode =
       currentParsed.colorCode ||
-      (selectedColors[0] ? COLOR_TO_CODE[selectedColors[0].toLowerCase()] : "WL");
-    setCode(formatProductCode(catCode, currentParsed.serial || "0001", colorCode));
+      (selectedColors[0] ? colorCode(selectedColors[0]) : "WL");
+    setCode(formatProductCode(catCode, currentParsed.serial || "0001", colCode));
   }
 
   function handleColorSelect(colName: string) {
     toggleColor(colName);
-    const colCode = COLOR_TO_CODE[colName.toLowerCase()] || "WL";
+    const colCode = colorCode(colName);
     const currentParsed = parseProductCode(code);
     const cat = categories.find((c) => c.id === categoryId);
     const catCode = cat?.code || currentParsed.categoryCode || "LC";
@@ -224,17 +227,17 @@ export function ProductForm({
           {/* Color Selection */}
           <div className="sm:col-span-2">
             <div className="flex items-center justify-between">
-              <label className="label">Available Colors / Finishes (3 only)</label>
+              <label className="label">Available Colors / Finishes</label>
               <span className="text-xs text-[var(--color-muted)]">
-                Walnut (WL), Natural (NT), Black (BL)
+                Manage the list in Cost Calculator → Rates & Hierarchy Master
               </span>
             </div>
             <div className="mt-1.5 flex flex-wrap gap-2">
-              {STANDARD_PRODUCT_COLORS.map((col) => {
+              {allColors.map((col) => {
                 const checked = selectedColors.includes(col.name);
                 return (
                   <button
-                    key={col.code}
+                    key={col.name}
                     type="button"
                     onClick={() => handleColorSelect(col.name)}
                     className={`flex items-center gap-2 rounded-full px-3 py-1 text-xs font-medium transition-all ${
@@ -244,7 +247,7 @@ export function ProductForm({
                     }`}
                   >
                     <span
-                      className="inline-block h-2.5 w-2.5 rounded-full border border-black/20"
+                      className="inline-block h-2.5 w-2.5 rounded-full border border-black/20 bg-slate-300"
                       style={{ backgroundColor: col.hex }}
                     />
                     <span>
@@ -360,7 +363,12 @@ export function ProductForm({
           productId={product?.id}
           initialImages={initialImages}
           productName={product?.name}
-          currentColor={selectedColors[0] || "Walnut"}
+          currentColor={selectedColors[0]}
+          colors={
+            selectedColors.length
+              ? allColors.filter((c) => selectedColors.includes(c.name))
+              : allColors
+          }
         />
       </div>
 

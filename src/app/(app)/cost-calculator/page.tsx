@@ -2,6 +2,7 @@ import Link from "next/link";
 import { requireUser } from "@/lib/supabase/server";
 import { PageHeader } from "@/components/ui";
 import { loadSettings } from "@/lib/settings";
+import { resolveColors } from "@/lib/product-code";
 import { CostCalculatorView } from "./calculator-view";
 import { CostMasterView } from "./master-view";
 import type {
@@ -204,10 +205,12 @@ export default async function CostCalculatorPage({
 
       {activeTab === "calculator" ? (
         <CostCalculatorView
+          // Fresh state (photos, lines) when switching to another product
+          key={initialProduct?.id ?? "new"}
           stages={nestedStages}
           categories={productCats ?? []}
           products={productsData ?? []}
-          productColors={settings.product_colors ?? ["Walnut", "Natural", "Teak"]}
+          productColors={resolveColors(settings.product_colors, settings.color_hex)}
           initialProduct={initialProduct}
           initialSheet={initialSheet}
           initialImages={initialImages}
@@ -215,7 +218,7 @@ export default async function CostCalculatorPage({
       ) : (
         <CostMasterView
           stages={nestedStages}
-          productColors={settings.product_colors ?? ["Walnut", "Natural", "Teak"]}
+          productColors={resolveColors(settings.product_colors, settings.color_hex)}
         />
       )}
     </>

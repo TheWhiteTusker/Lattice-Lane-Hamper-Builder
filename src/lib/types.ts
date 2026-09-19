@@ -314,4 +314,6 @@ export type Settings = {
   quote_terms: string;
   pi_terms: string;
   product_colors: string[];
+  /** Swatch colour per product colour name, picked in the Rates & Hierarchy Master. */
+  color_hex: Record<string, string>;
 };

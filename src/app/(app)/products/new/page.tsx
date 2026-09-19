@@ -1,5 +1,6 @@
 import { requireRole } from "@/lib/supabase/server";
 import { loadSettings } from "@/lib/settings";
+import { resolveColors } from "@/lib/product-code";
 import { PageHeader } from "@/components/ui";
 import { ProductForm } from "../product-form";
 import type { Category } from "@/lib/types";
@@ -18,7 +19,7 @@ export default async function NewProductPage() {
       <ProductForm
         categories={categories ?? []}
         sources={settings.sources}
-        allColors={settings.product_colors}
+        allColors={resolveColors(settings.product_colors, settings.color_hex)}
       />
     </>
   );

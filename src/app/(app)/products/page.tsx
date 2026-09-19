@@ -1,9 +1,9 @@
 import Link from "next/link";
-import Image from "next/image";
 import { requireUser, isAdmin } from "@/lib/supabase/server";
 import { PageHeader, EmptyState } from "@/components/ui";
 import { formatMoney } from "@/lib/pricing";
 import { LoadMore } from "@/components/load-more";
+import { ImagePreview } from "@/components/image-preview";
 import { pageLimit } from "@/lib/paging";
 import type { Category, ProductWithCategory } from "@/lib/types";
 
@@ -132,24 +132,15 @@ export default async function ProductsPage({ searchParams }: { searchParams: Sea
                 <tr key={p.id} className={p.is_active ? "" : "opacity-55"}>
                   <td className="w-12 py-1.5 px-2 text-center">
                     {p.image_url ? (
-                      <Link
-                        href={`/products/${encodeURIComponent(p.code)}`}
-                        title={`View/edit photos for ${p.name}`}
-                      >
-                        <div className="relative mx-auto h-9 w-9 overflow-hidden rounded-md border border-slate-200 bg-slate-100 shadow-2xs hover:ring-2 hover:ring-[var(--color-brand)] transition-all">
-                          <Image
-                            src={p.image_url}
-                            alt={p.name}
-                            fill
-                            sizes="36px"
-                            className="object-cover"
-                            unoptimized
-                          />
-                        </div>
-                      </Link>
+                      <ImagePreview
+                        src={p.image_url}
+                        alt={p.name}
+                        sizes="36px"
+                        className="mx-auto h-9 w-9 rounded-md border border-slate-200 bg-slate-100 shadow-2xs hover:ring-2 hover:ring-[var(--color-brand)] transition-all"
+                      />
                     ) : (
                       <Link
-                        href={`/products/${encodeURIComponent(p.code)}`}
+                        href={`/products/${encodeURIComponent(p.code)}?edit=1`}
                         title={`Add photos for ${p.name}`}
                         className="mx-auto flex h-9 w-9 items-center justify-center rounded-md border border-dashed border-slate-300 bg-slate-50 text-[10px] font-semibold text-slate-400 hover:border-[var(--color-brand)] hover:text-[var(--color-brand)] transition-colors"
                       >
@@ -189,10 +180,10 @@ export default async function ProductsPage({ searchParams }: { searchParams: Sea
                       </Link>
                       {admin && (
                         <Link
-                          href={`/products/${encodeURIComponent(p.code)}`}
+                          href={`/products/${encodeURIComponent(p.code)}?edit=1`}
                           className="font-medium text-[var(--color-ink)] hover:text-[var(--color-brand)] hover:underline"
                         >
-                          Photos & Edit
+                          Edit
                         </Link>
                       )}
                     </div>

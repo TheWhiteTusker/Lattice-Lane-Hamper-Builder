@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
 import { formatMoney } from "@/lib/pricing.ts";
 import {
   saveCostCategory,
@@ -12,7 +12,12 @@ import {
   saveProductColors,
 } from "./actions";
 import { COMMON_UNITS } from "@/lib/costing.ts";
-import { STANDARD_PRODUCT_COLORS } from "@/lib/product-code";
+import {
+  STANDARD_PRODUCT_COLORS,
+  FALLBACK_COLOR_HEX,
+  colorCode,
+  type ProductColor,
+} from "@/lib/product-code";
 import type { CostStageWithHierarchy, CostVariety } from "@/lib/types";
 
 export function CostMasterView({
@@ -20,13 +25,15 @@ export function CostMasterView({
   productColors,
 }: {
   stages: CostStageWithHierarchy[];
-  productColors: string[];
+  productColors: ProductColor[];
 }) {
   const [isPending, startTransition] = useTransition();
 
   // Color management state
-  const [colors, setColors] = useState<string[]>(productColors);
+  const [colors, setColors] = useState<ProductColor[]>(productColors);
   const [newColor, setNewColor] = useState("");
+  const [newHex, setNewHex] = useState(FALLBACK_COLOR_HEX);
+  const hexSaveTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
   const [colorMsg, setColorMsg] = useState("");
 
   // Category addition state
@@ -47,13 +54,14 @@ export function CostMasterView({
   function handleAddColor() {
     if (!newColor.trim()) return;
     const trimmed = newColor.trim();
-    if (colors.some((c) => c.toLowerCase() === trimmed.toLowerCase())) {
+    if (colors.some((c) => c.name.toLowerCase() === trimmed.toLowerCase())) {
       setColorMsg("Color already exists.");
       return;
     }
-    const updated = [...colors, trimmed];
+    const updated = [...colors, { name: trimmed, code: colorCode(trimmed), hex: newHex }];
     setColors(updated);
     setNewColor("");
+    setNewHex(FALLBACK_COLOR_HEX);
     startTransition(async () => {
       await saveProductColors(updated);
       setColorMsg("Colors updated successfully.");
@@ -61,8 +69,22 @@ export function CostMasterView({
     });
   }
 
+  // The picker fires on every drag step; save once it settles.
+  function handleHexChange(name: string, hex: string) {
+    const updated = colors.map((c) => (c.name === name ? { ...c, hex } : c));
+    setColors(updated);
+    clearTimeout(hexSaveTimer.current);
+    hexSaveTimer.current = setTimeout(() => {
+      startTransition(async () => {
+        await saveProductColors(updated);
+        setColorMsg("Color updated.");
+        setTimeout(() => setColorMsg(""), 3000);
+      });
+    }, 400);
+  }
+
   function handleRemoveColor(col: string) {
-    const updated = colors.filter((c) => c !== col);
+    const updated = colors.filter((c) => c.name !== col);
     setColors(updated);
     startTransition(async () => {
       await saveProductColors(updated);
@@ -175,29 +197,50 @@ export function CostMasterView({
               Standard Product Colors & Finishes
             </h3>
             <p className="text-xs text-[var(--color-muted)] mt-0.5">
-              Each product comes strictly in 3 standard colors: <strong>Walnut (WL)</strong>, <strong>Natural (NT)</strong>, and <strong>Black (BL)</strong>.
+              Standard <strong>Walnut (WL)</strong>, <strong>Natural (NT)</strong> and <strong>Black (BL)</strong>, plus any finish you add below.
             </p>
           </div>
           <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-bold text-emerald-800 border border-emerald-200">
-            3 Standard Finishes
+            {colors.length} Finishes
           </span>
         </div>
 
         <div className="mt-4 grid gap-3 sm:grid-cols-3">
-          {STANDARD_PRODUCT_COLORS.map((c) => (
+          {colors.map((c) => (
             <div
-              key={c.code}
+              key={c.name}
               className="flex items-center gap-3 rounded-xl border border-slate-200 bg-white p-3 shadow-xs"
             >
-              <span
-                className="h-7 w-7 rounded-full border border-black/20 shadow-xs shrink-0"
+              <label
+                title={`Pick the ${c.name} swatch`}
+                className="relative h-7 w-7 shrink-0 cursor-pointer rounded-full border border-black/20 shadow-xs"
                 style={{ backgroundColor: c.hex }}
-              />
+              >
+                <input
+                  type="color"
+                  value={c.hex}
+                  onChange={(e) => handleHexChange(c.name, e.target.value)}
+                  aria-label={`${c.name} swatch color`}
+                  className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+                />
+              </label>
               <div className="min-w-0 flex-1">
-                <div className="flex items-center justify-between">
+                <div className="flex items-center justify-between gap-2">
                   <span className="text-sm font-bold text-[var(--color-ink)]">{c.name}</span>
-                  <span className="rounded font-mono font-black text-xs bg-slate-100 px-1.5 py-0.5 text-slate-800">
-                    {c.code}
+                  <span className="flex items-center gap-1">
+                    <span className="rounded font-mono font-black text-xs bg-slate-100 px-1.5 py-0.5 text-slate-800">
+                      {c.code}
+                    </span>
+                    {!STANDARD_PRODUCT_COLORS.some((s) => s.name === c.name) && (
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveColor(c.name)}
+                        title={`Remove ${c.name}`}
+                        className="px-1 text-slate-400 hover:text-red-600 transition-colors"
+                      >
+                        &times;
+                      </button>
+                    )}
                   </span>
                 </div>
                 <span className="text-[11px] text-[var(--color-muted)]">Code suffix: /{c.code}</span>
@@ -206,28 +249,15 @@ export function CostMasterView({
           ))}
         </div>
 
-        <div className="mt-4 flex flex-wrap items-center gap-2">
-          {colors.map((col) => (
-            <span
-              key={col}
-              className="inline-flex items-center gap-1.5 rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-[var(--color-ink)] border border-slate-200"
-            >
-              {col}
-              {!["Walnut", "Natural", "Black"].includes(col) && (
-                <button
-                  type="button"
-                  onClick={() => handleRemoveColor(col)}
-                  title={`Remove ${col}`}
-                  className="ml-1 text-slate-400 hover:text-red-600 transition-colors"
-                >
-                  &times;
-                </button>
-              )}
-            </span>
-          ))}
-        </div>
-
         <div className="mt-3 flex items-center gap-2 max-w-sm">
+          <input
+            type="color"
+            value={newHex}
+            onChange={(e) => setNewHex(e.target.value)}
+            title="Swatch color for the new finish"
+            aria-label="Swatch color for the new finish"
+            className="h-8 w-10 shrink-0 cursor-pointer rounded border border-slate-300 bg-white p-0.5"
+          />
           <input
             value={newColor}
             onChange={(e) => setNewColor(e.target.value)}

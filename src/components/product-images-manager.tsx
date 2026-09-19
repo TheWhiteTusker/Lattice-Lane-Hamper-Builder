@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition, useRef } from "react";
+import { useEffect, useState, useTransition, useRef } from "react";
 import Image from "next/image";
 import {
   uploadProductImage,
@@ -9,7 +9,7 @@ import {
   updateProductImageColor,
   deleteProductImage,
 } from "@/app/(app)/products/image-actions";
-import { STANDARD_PRODUCT_COLORS } from "@/lib/product-code";
+import { FALLBACK_COLOR_HEX, type ProductColor } from "@/lib/product-code";
 import type { ProductImage } from "@/lib/types";
 
 export function ProductImagesManager({
@@ -17,15 +17,24 @@ export function ProductImagesManager({
   initialImages = [],
   productName,
   currentColor,
+  colors,
+  onImagesChange,
 }: {
   productId?: string | null;
   initialImages?: ProductImage[];
   productName?: string;
   currentColor?: string | null;
+  /** The finishes this product comes in; one photo tab each. */
+  colors: ProductColor[];
+  /** Told about every upload, delete or re-tag, so a parent can mirror the list. */
+  onImagesChange?: (images: ProductImage[]) => void;
 }) {
   const [images, setImages] = useState<ProductImage[]>(initialImages);
+  useEffect(() => onImagesChange?.(images), [images, onImagesChange]);
   const [activeTab, setActiveTab] = useState<string>("all");
-  const [uploadColor, setUploadColor] = useState<string>(currentColor || "Walnut");
+  const [uploadColor, setUploadColor] = useState<string>(
+    currentColor || colors[0]?.name || "General",
+  );
   const [isPrimaryUpload, setIsPrimaryUpload] = useState<boolean>(images.length === 0);
   const [urlInput, setUrlInput] = useState<string>("");
   const [showUrlInput, setShowUrlInput] = useState<boolean>(false);
@@ -45,7 +54,7 @@ export function ProductImagesManager({
           Photos & Color Finishes
         </h4>
         <p className="mt-1 text-xs text-[var(--color-muted)]">
-          Save this product first to upload high-resolution photos for Walnut, Natural, and Black finishes.
+          Save this product first to upload photos for each of its color finishes.
         </p>
       </div>
     );
@@ -173,9 +182,9 @@ export function ProductImagesManager({
 
   // Count per color
   const countAll = images.length;
-  const countWalnut = images.filter((i) => i.color === "Walnut" || i.color_code === "WL").length;
-  const countNatural = images.filter((i) => i.color === "Natural" || i.color_code === "NT").length;
-  const countBlack = images.filter((i) => i.color === "Black" || i.color_code === "BL").length;
+  const isOfColor = (img: ProductImage, col: ProductColor) =>
+    img.color?.toLowerCase() === col.name.toLowerCase() ||
+    img.color_code?.toUpperCase() === col.code;
   const countGeneral = images.filter((i) => !i.color && !i.color_code).length;
 
   return (
@@ -186,7 +195,7 @@ export function ProductImagesManager({
             Product Images & Color Variations
           </h3>
           <p className="text-xs text-[var(--color-muted)] mt-0.5">
-            Upload photos for each color finish (Walnut, Natural, Black). Multiple images supported per product.
+            Pick a color tab, then upload its photos. Multiple images supported per color.
           </p>
         </div>
 
@@ -215,15 +224,17 @@ export function ProductImagesManager({
           All Photos ({countAll})
         </button>
 
-        {STANDARD_PRODUCT_COLORS.map((col) => {
-          const count =
-            col.code === "WL" ? countWalnut : col.code === "NT" ? countNatural : countBlack;
+        {colors.map((col) => {
+          const count = images.filter((i) => isOfColor(i, col)).length;
           const isActive = activeTab.toLowerCase() === col.name.toLowerCase();
           return (
             <button
-              key={col.code}
+              key={col.name}
               type="button"
-              onClick={() => setActiveTab(col.name)}
+              onClick={() => {
+                setActiveTab(col.name);
+                setUploadColor(col.name);
+              }}
               className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold transition-all ${
                 isActive
                   ? "bg-[var(--color-brand)] text-white shadow-xs"
@@ -263,8 +274,8 @@ export function ProductImagesManager({
             onChange={(e) => setUploadColor(e.target.value)}
             className="select text-xs py-1 px-2.5 bg-white min-w-[130px]"
           >
-            {STANDARD_PRODUCT_COLORS.map((c) => (
-              <option key={c.code} value={c.name}>
+            {colors.map((c) => (
+              <option key={c.name} value={c.name}>
                 {c.name} ({c.code})
               </option>
             ))}
@@ -349,9 +360,7 @@ export function ProductImagesManager({
       ) : (
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
           {filteredImages.map((img) => {
-            const colorObj = STANDARD_PRODUCT_COLORS.find(
-              (c) => c.name === img.color || c.code === img.color_code,
-            );
+            const colorObj = colors.find((c) => isOfColor(img, c));
 
             return (
               <div
@@ -398,15 +407,15 @@ export function ProductImagesManager({
                     <div className="flex items-center gap-1.5 min-w-0">
                       <span
                         className="h-2 w-2 rounded-full border border-black/20 shrink-0"
-                        style={{ backgroundColor: colorObj?.hex || "#94a3b8" }}
+                        style={{ backgroundColor: colorObj?.hex || FALLBACK_COLOR_HEX }}
                       />
                       <select
                         value={img.color || "General"}
                         onChange={(e) => handleChangeColor(img.id, e.target.value)}
                         className="text-[11px] font-medium text-slate-700 bg-transparent border-0 p-0 focus:ring-0 cursor-pointer truncate"
                       >
-                        {STANDARD_PRODUCT_COLORS.map((c) => (
-                          <option key={c.code} value={c.name}>
+                        {colors.map((c) => (
+                          <option key={c.name} value={c.name}>
                             {c.name} ({c.code})
                           </option>
                         ))}

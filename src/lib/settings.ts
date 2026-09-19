@@ -36,6 +36,7 @@ export const SETTINGS_DEFAULTS: Settings = {
   quote_terms: "",
   pi_terms: "",
   product_colors: ["Walnut", "Natural", "Black"],
+  color_hex: {},
 };
 
 /** Flattens the app_settings key/value rows into one Settings object. */

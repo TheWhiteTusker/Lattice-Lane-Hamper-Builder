@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { describeError } from "@/lib/forms";
-import { COLOR_TO_CODE, CODE_TO_COLOR } from "@/lib/product-code";
+import { CODE_TO_COLOR, colorCode as toColorCode } from "@/lib/product-code";
 import type { ProductImage } from "@/lib/types";
 
 export type ImageActionResult = {
@@ -38,7 +38,7 @@ export async function uploadProductImage(formData: FormData): Promise<ImageActio
     }
 
     // Determine color & code
-    const colorCode = rawColor ? COLOR_TO_CODE[rawColor.toLowerCase()] || null : null;
+    const colorCode = rawColor ? toColorCode(rawColor) : null;
     const colorName = colorCode ? (CODE_TO_COLOR as Record<string, string>)[colorCode] || rawColor : rawColor;
 
     // Generate safe storage path
@@ -137,7 +137,7 @@ export async function addExternalProductImage(
     if (!cleanUrl) return { error: "Image URL is required." };
     if (!productId) return { error: "Product ID is missing." };
 
-    const colorCode = color ? COLOR_TO_CODE[color.toLowerCase()] || null : null;
+    const colorCode = color ? toColorCode(color) : null;
     const colorName = colorCode ? (CODE_TO_COLOR as Record<string, string>)[colorCode] || color : color;
 
     if (isPrimary) {
@@ -229,7 +229,7 @@ export async function updateProductImageColor(
 ): Promise<ImageActionResult> {
   try {
     const supabase = await createClient();
-    const colorCode = rawColor ? COLOR_TO_CODE[rawColor.toLowerCase()] || null : null;
+    const colorCode = rawColor ? toColorCode(rawColor) : null;
     const colorName = colorCode ? (CODE_TO_COLOR as Record<string, string>)[colorCode] || rawColor : rawColor;
 
     const { data: updated, error } = await supabase

@@ -6,6 +6,8 @@ import {
   getNextSerialForCategory,
   deriveCategoryCode,
   STANDARD_PRODUCT_COLORS,
+  colorCode,
+  resolveColors,
 } from "./product-code.ts";
 
 test("STANDARD_PRODUCT_COLORS contains exactly Walnut (WL), Natural (NT), and Black (BL)", () => {
@@ -74,4 +76,20 @@ test("deriveCategoryCode generates 2-letter uppercase initials", () => {
   assert.equal(deriveCategoryCode("Box & Packaging"), "BP");
   assert.equal(deriveCategoryCode("Decor"), "DE");
   assert.equal(deriveCategoryCode("Utility"), "UT");
+});
+
+test("colorCode keeps standard codes and derives codes for added colors", () => {
+  assert.equal(colorCode("Walnut"), "WL");
+  assert.equal(colorCode("NT"), "NT");
+  assert.equal(colorCode("Brown Paper"), "BP");
+  assert.equal(colorCode("Teak"), "TE");
+  assert.equal(colorCode("Blue"), "BE"); // BL is Black's, so first + last letter
+  assert.equal(formatProductCode("LC", 1, "Brown Paper"), "LC/0001/BP");
+  assert.equal(parseProductCode("LC/0001/BP").isValid, true);
+  // Picked swatch wins, then the standard swatch, then neutral grey
+  assert.deepEqual(resolveColors(["Black", "Teak", "White"], { Teak: "#b5651d" }), [
+    { name: "Black", code: "BL", hex: "#222222" },
+    { name: "Teak", code: "TE", hex: "#b5651d" },
+    { name: "White", code: "WH", hex: "#94a3b8" },
+  ]);
 });

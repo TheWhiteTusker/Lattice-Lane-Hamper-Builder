@@ -162,8 +162,10 @@ export function calculateLineCost(line: Partial<ProductCostLine>): {
 } {
   const stage = (line.stage_code ?? "").toLowerCase();
   const rate = num(line.rate);
-  const qty = num(line.qty) || 1;
-  const wastage = num(line.wastage_pct);
+  // Blank qty means 1; an explicit 0 means the line costs nothing.
+  const qty = line.qty == null ? 1 : num(line.qty);
+  // Bought-out items take only the sheet-level markup, never a per-line one.
+  const wastage = stage === "bought_out" ? 0 : num(line.wastage_pct);
 
   // Machine stage is priced per minute
   if (stage === "machine") {

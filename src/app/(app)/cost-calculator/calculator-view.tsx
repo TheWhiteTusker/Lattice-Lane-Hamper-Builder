@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useTransition } from "react";
+import { useCallback, useState, useMemo, useTransition } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
@@ -15,9 +15,10 @@ import {
   formatProductCode,
   parseProductCode,
   getNextSerialForCategory,
-  STANDARD_PRODUCT_COLORS,
-  COLOR_TO_CODE,
+  colorCode,
+  codesForColors,
   deriveCategoryCode,
+  type ProductColor,
 } from "@/lib/product-code";
 import {
   saveCostSheetAndProduct,
@@ -25,6 +26,8 @@ import {
   type SaveCostSheetPayload,
 } from "./actions";
 import { ProductImagesManager } from "@/components/product-images-manager";
+import { uploadProductImage } from "@/app/(app)/products/image-actions";
+import { ImagePreview } from "@/components/image-preview";
 import type {
   Category,
   CostStageWithHierarchy,
@@ -44,12 +47,13 @@ const BOUGHT_OUT = "bought_out";
 const createEmptyLine = (
   stageCode: string,
   categories: CostStageWithHierarchy["categories"],
+  qty = 1,
 ): LineState => {
   const firstCat = categories[0];
   const firstSub = firstCat?.subcategories[0];
   const firstVar = firstSub?.varieties[0];
 
-  return {
+  const line: LineState = {
     id: crypto.randomUUID(),
     sheet_id: "",
     tempKey: crypto.randomUUID(),
@@ -67,19 +71,22 @@ const createEmptyLine = (
       firstVar?.unit ??
       (stageCode === "machine" ? "min" : categories.length > 0 ? "sq ft" : "piece"),
     rate: firstVar?.default_rate ?? 0,
-    qty: 1,
+    qty,
     duration_minutes: stageCode === "machine" ? 15 : null,
     wastage_pct: firstVar?.default_wastage_pct ?? 0,
     sort_order: 0,
     calculated_area: 1,
     line_total: 0,
   };
+  // The row must show the same amount the totals count for it.
+  return { ...line, line_total: calculateLineCost(line).line_total };
 };
 
 export function CostCalculatorView({
   stages,
   categories,
   products,
+  productColors = [],
   initialProduct,
   initialSheet,
   initialImages = [],
@@ -87,7 +94,7 @@ export function CostCalculatorView({
   stages: CostStageWithHierarchy[];
   categories: Category[];
   products: Product[];
-  productColors?: string[];
+  productColors?: ProductColor[];
   initialProduct?: Product | null;
   initialSheet?: ProductCostSheet | null;
   initialImages?: ProductImage[];
@@ -147,6 +154,34 @@ export function CostCalculatorView({
     success?: string;
   }>({});
 
+  // Photos for the colour rows; the gallery below reports its own edits back.
+  const [images, setImages] = useState<ProductImage[]>(initialImages);
+  // Bumped after a row upload so the gallery remounts with the new photos.
+  const [photoVersion, setPhotoVersion] = useState(0);
+  // Colour -> product id once a multi-colour save has split the product.
+  const [variantIds, setVariantIds] = useState<Record<string, string>>({});
+  const productIdFor = (colName: string) => variantIds[colName] ?? selectedProductId;
+  // The gallery only manages this product's photos; keep sibling colours' ones.
+  const handleGalleryChange = useCallback(
+    (gallery: ProductImage[]) =>
+      setImages((prev) => [
+        ...prev.filter((img) => img.product_id !== selectedProductId),
+        ...gallery,
+      ]),
+    [selectedProductId],
+  );
+  // Photos picked before the product's first save. A photo row needs the
+  // product's id, so these wait in the browser and upload right after saving.
+  const [pending, setPending] = useState<{ key: string; color: string; file: File; url: string }[]>(
+    [],
+  );
+  const [upload, setUpload] = useState<{
+    color: string;
+    busy?: boolean;
+    error?: string;
+    ok?: string;
+  } | null>(null);
+
   // Cost Lines State
   const [lines, setLines] = useState<LineState[]>(() => {
     if (initialSheet?.lines && initialSheet.lines.length > 0) {
@@ -156,8 +191,9 @@ export function CostCalculatorView({
       }));
     }
 
-    // Default with one line per stage to get started quickly
-    return stages.map((s) => createEmptyLine(s.code, s.categories));
+    // One placeholder line per stage to get started quickly. Qty 0 so a blank
+    // sheet costs nothing until the user fills a line in.
+    return stages.map((s) => createEmptyLine(s.code, s.categories, 0));
   });
 
   // Lookup map for stages and their categories
@@ -336,7 +372,7 @@ export function CostCalculatorView({
   }
 
   // Bought-out items (Hybrid only): a finished item purchased in, priced
-  // rate x qty x (1 + markup%). wastage_pct carries the markup - same maths.
+  // rate x qty; only the sheet-level markup applies.
   function addBoughtOutLine() {
     setLines((prev) => [
       ...prev,
@@ -408,16 +444,87 @@ export function CostCalculatorView({
     setCode(formatProductCode(catCode, serial, colCode));
   }
 
+  // Multi-select: a product can come in several finishes. The code suffix
+  // follows the first selected one.
   function handleColorSelect(colName: string) {
-    setSelectedColors([colName]);
-    const colCode = COLOR_TO_CODE[colName.toLowerCase()] || "WL";
+    const next = selectedColors.includes(colName)
+      ? selectedColors.filter((c) => c !== colName)
+      : [...selectedColors, colName];
+    setSelectedColors(next);
+    if (!next[0]) return;
     const cat = categories.find((c) => c.id === categoryId);
     const catCode = cat?.code || parsedCode.categoryCode || "LC";
-    setCode(formatProductCode(catCode, parsedCode.serial || "0001", colCode));
+    setCode(formatProductCode(catCode, parsedCode.serial || "0001", colorCode(next[0])));
+  }
+
+  // Uploads files for one colour. Returns what landed and the first error.
+  async function uploadFiles(productId: string, colName: string, files: File[], existing: number) {
+    const added: ProductImage[] = [];
+    for (const [i, file] of files.entries()) {
+      const fd = new FormData();
+      fd.append("file", file);
+      fd.append("productId", productId);
+      fd.append("color", colName);
+      // First photo of a product with none becomes its cover
+      fd.append("isPrimary", String(existing + added.length === 0 && i === 0));
+      const res = await uploadProductImage(fd).catch((e: unknown) => ({
+        error: e instanceof Error ? e.message : "Upload failed.",
+        image: undefined,
+      }));
+      if (res.error || !res.image) return { added, error: res.error ?? "Upload failed." };
+      added.push(res.image);
+    }
+    return { added, error: "" };
+  }
+
+  // Upload photos from a colour row, tagged with that colour. Status shows on
+  // the row itself so a failure is never silent. Before the first save the
+  // photos are queued and uploaded by handleSave.
+  async function handleColorUpload(colName: string, input: HTMLInputElement) {
+    const files = Array.from(input.files ?? []);
+    input.value = "";
+    if (!files.length) return;
+    if (!selectedColors.includes(colName)) handleColorSelect(colName);
+
+    if (!selectedProductId) {
+      setPending((prev) => [
+        ...prev,
+        ...files.map((file) => ({
+          key: crypto.randomUUID(),
+          color: colName,
+          file,
+          url: URL.createObjectURL(file),
+        })),
+      ]);
+      setUpload({ color: colName, ok: `${files.length} will upload on save` });
+      return;
+    }
+
+    setUpload({ color: colName, busy: true });
+    const pid = productIdFor(colName);
+    const { added, error } = await uploadFiles(
+      pid,
+      colName,
+      files,
+      images.filter((img) => img.product_id === pid).length,
+    );
+    if (added.length) {
+      setImages((prev) => [...prev, ...added]);
+      setPhotoVersion((v) => v + 1);
+    }
+    setUpload(error ? { color: colName, error } : { color: colName, ok: `${added.length} added` });
+  }
+
+  function removePending(key: string) {
+    setPending((prev) => {
+      const gone = prev.find((p) => p.key === key);
+      if (gone) URL.revokeObjectURL(gone.url);
+      return prev.filter((p) => p.key !== key);
+    });
   }
 
   // Save to Product Master
-  function handleSave(allVariants: boolean = false) {
+  function handleSave() {
     setFeedback({});
     if (!code.trim()) {
       setFeedback({ error: "Product Code is required." });
@@ -441,7 +548,6 @@ export function CostCalculatorView({
         markupPct: num(markupPct),
         sellingPrice: effectiveSp,
         notes: notes.trim() || null,
-        createAllColorVariants: allVariants,
         lines: activeLines.map((l) => ({
           stage_code: l.stage_code,
           category_name: l.category_name,
@@ -466,12 +572,36 @@ export function CostCalculatorView({
       if (res.error) {
         setFeedback({ error: res.error });
       } else {
-        const variantMsg =
-          res.variants && res.variants.length > 0
-            ? ` Generated all 3 variants (${res.variants.join(", ")}).`
-            : "";
+        let photoMsg = "";
+        const ids: Record<string, string> = Object.fromEntries(
+          (res.variants ?? []).map((v) => [v.color, v.id]),
+        );
+        setVariantIds(ids);
+        if (res.productId && pending.length) {
+          const added: ProductImage[] = [];
+          const failed: string[] = [];
+          for (const colName of new Set(pending.map((p) => p.color))) {
+            const pid = ids[colName] ?? res.productId;
+            const files = pending.filter((p) => p.color === colName).map((p) => p.file);
+            const existing = [...images, ...added].filter((img) => img.product_id === pid).length;
+            const r = await uploadFiles(pid, colName, files, existing);
+            added.push(...r.added);
+            if (r.error) failed.push(`${colName}: ${r.error}`);
+          }
+          pending.forEach((p) => URL.revokeObjectURL(p.url));
+          setPending([]);
+          setImages((prev) => [...prev, ...added]);
+          setPhotoVersion((v) => v + 1);
+          photoMsg = failed.length
+            ? ` ${added.length} photo(s) uploaded; failed — ${failed.join("; ")}`
+            : ` ${added.length} photo(s) uploaded.`;
+        }
         setFeedback({
-          success: `Saved successfully! Product ${res.productCode} updated with CP ${formatMoney(res.totalCost)} and SP ${formatMoney(res.sellingPrice)}.${variantMsg}`,
+          success: `Saved successfully! ${
+            (res.variants?.length ?? 0) > 1
+              ? `Products ${res.variants!.map((v) => v.code).join(", ")}`
+              : `Product ${res.productCode}`
+          } updated with CP ${formatMoney(res.totalCost)} and SP ${formatMoney(res.sellingPrice)}.${photoMsg}`,
         });
         if (res.productId) setSelectedProductId(res.productId);
       }
@@ -553,17 +683,37 @@ export function CostCalculatorView({
               required
               className="input mt-1 font-mono uppercase font-semibold"
             />
-            <div className="mt-1 flex items-center justify-between text-xs">
-              <span
-                className={
-                  parsedCode.isValid ? "text-emerald-700 font-medium" : "text-amber-700"
-                }
-              >
-                {parsedCode.isValid
-                  ? `✓ ${parsedCode.categoryCode}/${parsedCode.serial}/${parsedCode.colorCode} (${parsedCode.colorName})`
-                  : `Format: LC/0001/WL`}
-              </span>
-            </div>
+            {selectedColors.length > 1 && code.trim() ? (
+              // Several colours save as one product each: show every code here
+              <div className="mt-1.5 flex flex-wrap gap-1" title="One product is saved per color">
+                {codesForColors(code, selectedColors).map((c) => (
+                  <span
+                    key={c.code}
+                    className="flex items-center gap-1 rounded bg-emerald-50 px-1.5 py-0.5 font-mono text-[11px] font-semibold text-emerald-800 border border-emerald-200"
+                  >
+                    <span
+                      className="h-2 w-2 rounded-full border border-black/20"
+                      style={{
+                        backgroundColor: productColors.find((p) => p.name === c.color)?.hex,
+                      }}
+                    />
+                    {c.code}
+                  </span>
+                ))}
+              </div>
+            ) : (
+              <div className="mt-1 flex items-center justify-between text-xs">
+                <span
+                  className={
+                    parsedCode.isValid ? "text-emerald-700 font-medium" : "text-amber-700"
+                  }
+                >
+                  {parsedCode.isValid
+                    ? `✓ ${parsedCode.categoryCode}/${parsedCode.serial}/${parsedCode.colorCode} (${parsedCode.colorName})`
+                    : `Format: LC/0001/WL`}
+                </span>
+              </div>
+            )}
           </div>
 
           <div>
@@ -625,47 +775,127 @@ export function CostCalculatorView({
           </div>
         </div>
 
-        {/* Color Variants & Active status */}
-        <div className="mt-4 flex flex-wrap items-center justify-between gap-4 border-t border-[var(--color-border)] pt-4">
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="text-xs font-semibold text-[var(--color-ink)] mr-1">
-              Color Finish (3 standard colors):
+        {/* Color finishes: one row per colour with its photos */}
+        <div className="mt-4 border-t border-[var(--color-border)] pt-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <span className="text-xs font-semibold text-[var(--color-ink)]">
+              Color Finishes &amp; Photos
             </span>
-            {STANDARD_PRODUCT_COLORS.map((col) => {
+            <label className="flex items-center gap-2 text-sm font-medium text-[var(--color-ink)] cursor-pointer">
+              <input
+                type="checkbox"
+                checked={isActive}
+                onChange={(e) => setIsActive(e.target.checked)}
+                className="h-4 w-4 rounded text-[var(--color-brand)] focus:ring-[var(--color-brand)]"
+              />
+              <span>Active in Product Master & Hamper Builder</span>
+            </label>
+          </div>
+          {!selectedProductId && (
+            <p className="mt-1 text-xs text-[var(--color-muted)]">
+              Photos you add now upload automatically when you save the product.
+            </p>
+          )}
+
+          <ul className="mt-2 divide-y divide-[var(--color-border)] rounded-lg border border-[var(--color-border)]">
+            {productColors.map((col) => {
               const checked = selectedColors.includes(col.name);
+              const colImages = images.filter(
+                (img) => img.color === col.name || img.color_code === col.code,
+              );
+              const colPending = pending.filter((p) => p.color === col.name);
+              const status = upload?.color === col.name ? upload : null;
               return (
-                <button
-                  key={col.code}
-                  type="button"
-                  onClick={() => handleColorSelect(col.name)}
-                  className={`flex items-center gap-2 rounded-full px-3 py-1 text-xs font-medium transition-all ${
-                    checked
-                      ? "bg-[var(--color-brand)] text-white shadow-sm ring-2 ring-[var(--color-brand)]/20"
-                      : "bg-[var(--color-sheet)] text-[var(--color-muted)] hover:bg-slate-200"
-                  }`}
-                >
-                  <span
-                    className="inline-block h-2.5 w-2.5 rounded-full border border-black/20"
-                    style={{ backgroundColor: col.hex }}
-                  />
-                  <span>
+                <li key={col.name} className="flex flex-wrap items-center gap-3 px-3 py-2">
+                  <label className="flex min-w-[190px] cursor-pointer items-center gap-2 text-xs font-medium text-[var(--color-ink)]">
+                    <input
+                      type="checkbox"
+                      checked={checked}
+                      onChange={() => handleColorSelect(col.name)}
+                      className="h-4 w-4 rounded text-[var(--color-brand)] focus:ring-[var(--color-brand)]"
+                    />
+                    <span
+                      className="inline-block h-3.5 w-3.5 rounded-full border border-black/20"
+                      style={{ backgroundColor: col.hex }}
+                    />
                     {col.name} ({col.code})
-                  </span>
-                  {checked && <span>✓</span>}
-                </button>
+                  </label>
+
+                  <div className="flex flex-1 items-center gap-1.5">
+                    {colImages.length === 0 && colPending.length === 0 ? (
+                      <span className="text-[11px] text-[var(--color-muted)]">No photos</span>
+                    ) : (
+                      colImages.slice(0, 5).map((img) => (
+                        <ImagePreview
+                          key={img.id}
+                          src={img.url}
+                          alt={`${name || "Product"} — ${col.name}`}
+                          sizes="40px"
+                          className="h-10 w-10 rounded-md border border-slate-200 bg-slate-100"
+                        />
+                      ))
+                    )}
+                    {colPending.map((p) => (
+                      <span
+                        key={p.key}
+                        title="Uploads when you save"
+                        className="relative h-10 w-10 overflow-hidden rounded-md border border-dashed border-amber-400"
+                      >
+                        {/* eslint-disable-next-line @next/next/no-img-element -- local blob preview */}
+                        <img src={p.url} alt={p.file.name} className="h-full w-full object-cover opacity-80" />
+                        <button
+                          type="button"
+                          onClick={() => removePending(p.key)}
+                          title="Remove"
+                          className="absolute right-0 top-0 flex h-4 w-4 items-center justify-center rounded-bl bg-white/90 text-[10px] leading-none text-red-600"
+                        >
+                          &times;
+                        </button>
+                      </span>
+                    ))}
+                    {colImages.length > 5 && (
+                      <span className="text-[11px] text-[var(--color-muted)]">
+                        +{colImages.length - 5}
+                      </span>
+                    )}
+                  </div>
+
+                  {status?.busy && (
+                    <span className="text-[11px] text-[var(--color-muted)]">Uploading…</span>
+                  )}
+                  {status?.error && (
+                    <span className="text-[11px] font-medium text-red-600">{status.error}</span>
+                  )}
+                  {status?.ok && (
+                    <span className="text-[11px] font-medium text-emerald-700">{status.ok}</span>
+                  )}
+
+                  <label
+                    title={
+                      selectedProductId
+                        ? `Upload ${col.name} photos`
+                        : `Add ${col.name} photos; they upload when you save`
+                    }
+                    className={`rounded-md border px-2.5 py-1 text-[11px] font-semibold transition-colors ${
+                      !upload?.busy
+                        ? "cursor-pointer border-[var(--color-brand)] text-[var(--color-brand)] hover:bg-emerald-50"
+                        : "cursor-not-allowed border-slate-200 text-slate-400"
+                    }`}
+                  >
+                    📷 Upload
+                    <input
+                      type="file"
+                      accept="image/*"
+                      multiple
+                      hidden
+                      disabled={upload?.busy}
+                      onChange={(e) => handleColorUpload(col.name, e.currentTarget)}
+                    />
+                  </label>
+                </li>
               );
             })}
-          </div>
-
-          <label className="flex items-center gap-2 text-sm font-medium text-[var(--color-ink)] cursor-pointer">
-            <input
-              type="checkbox"
-              checked={isActive}
-              onChange={(e) => setIsActive(e.target.checked)}
-              className="h-4 w-4 rounded text-[var(--color-brand)] focus:ring-[var(--color-brand)]"
-            />
-            <span>Active in Product Master & Hamper Builder</span>
-          </label>
+          </ul>
         </div>
       </div>
 
@@ -673,16 +903,23 @@ export function CostCalculatorView({
       {selectedProductId ? (
         <div className="card p-5 shadow-sm">
           <ProductImagesManager
-            key={selectedProductId}
+            // Remount after a colour-row upload so the gallery shows it
+            key={`${selectedProductId}-${photoVersion}`}
             productId={selectedProductId}
-            initialImages={initialImages}
+            initialImages={images.filter((img) => img.product_id === selectedProductId)}
+            onImagesChange={handleGalleryChange}
             productName={name}
-            currentColor={parsedCode.colorName || selectedColors[0] || "Walnut"}
+            currentColor={selectedColors[0]}
+            colors={
+              selectedColors.length
+                ? productColors.filter((c) => selectedColors.includes(c.name))
+                : productColors
+            }
           />
         </div>
       ) : (
         <div className="card p-4 border-dashed bg-slate-50/60 text-center text-xs text-[var(--color-muted)]">
-          Save this product first to upload and manage photos for Walnut, Natural, and Black finishes.
+          Save this product first to upload and manage photos for each of its color finishes.
         </div>
       )}
 
@@ -1090,7 +1327,7 @@ export function CostCalculatorView({
                 Bought Out Items
               </h3>
               <span className="text-xs text-[var(--color-muted)]">
-                (Finished items purchased in — Cost Price = Rate × Qty × (1 + Markup%))
+                (Finished items purchased in — Cost Price = Rate × Qty)
               </span>
             </div>
             <div className="flex items-center gap-3">
@@ -1109,7 +1346,6 @@ export function CostCalculatorView({
                   <th className="p-2 min-w-[95px]">Rate</th>
                   <th className="p-2 min-w-[110px]">Unit</th>
                   <th className="p-2 min-w-[70px]">Qty</th>
-                  <th className="p-2 min-w-[90px]">Markup %</th>
                   <th className="p-2 min-w-[110px] text-right">Cost Price</th>
                   <th className="p-2 min-w-[70px] text-center">Actions</th>
                 </tr>
@@ -1118,7 +1354,7 @@ export function CostCalculatorView({
                 {boughtOutLines.length === 0 ? (
                   <tr>
                     <td
-                      colSpan={7}
+                      colSpan={6}
                       className="py-6 text-center text-sm text-[var(--color-muted)]"
                     >
                       No bought-out items. Click &ldquo;+ Add Bought Out Item&rdquo; below to start.
@@ -1169,20 +1405,6 @@ export function CostCalculatorView({
                           value={line.qty}
                           onChange={(e) =>
                             updateLine(line.tempKey, { qty: Number(e.target.value) })
-                          }
-                          className="input input-num text-xs py-1 px-2"
-                        />
-                      </td>
-                      <td className="p-2">
-                        <input
-                          type="number"
-                          min="0"
-                          step="any"
-                          value={line.wastage_pct}
-                          onChange={(e) =>
-                            updateLine(line.tempKey, {
-                              wastage_pct: Number(e.target.value),
-                            })
                           }
                           className="input input-num text-xs py-1 px-2"
                         />
@@ -1428,20 +1650,11 @@ export function CostCalculatorView({
           <div className="flex flex-wrap items-center gap-3">
             <button
               type="button"
-              onClick={() => handleSave(false)}
+              onClick={handleSave}
               disabled={isPending}
               className="btn-primary px-5 py-2.5 text-sm font-bold shadow"
             >
               {isPending ? "Saving Costing…" : `Save Product (${code || "Primary"})`}
-            </button>
-            <button
-              type="button"
-              onClick={() => handleSave(true)}
-              disabled={isPending}
-              className="btn-secondary bg-emerald-50 text-[var(--color-brand-dark)] border-emerald-300 hover:bg-emerald-100 px-5 py-2.5 text-sm font-bold shadow-sm"
-              title="Creates or updates all 3 color codes: /WL, /NT, and /BL with identical costing"
-            >
-              Save All 3 Color Variants (WL, NT, BL)
             </button>
           </div>
         </div>

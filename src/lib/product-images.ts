@@ -1,5 +1,5 @@
 import type { ProductImage } from "./types.ts";
-import { COLOR_TO_CODE, CODE_TO_COLOR } from "./product-code.ts";
+import { COLOR_TO_CODE, CODE_TO_COLOR, colorCode } from "./product-code.ts";
 
 /**
  * Filter images for a specific color finish (e.g. "Walnut", "Natural", "Black" or "WL", "NT", "BL").
@@ -14,12 +14,12 @@ export function getImagesForColor(
   if (!colorOrCode) return images;
 
   const key = colorOrCode.trim().toLowerCase();
-  const normalizedCode = COLOR_TO_CODE[key] || (colorOrCode.toUpperCase() as "WL" | "NT" | "BL");
+  const normalizedCode = COLOR_TO_CODE[key] || colorCode(colorOrCode);
   const normalizedName = (CODE_TO_COLOR as Record<string, string>)[normalizedCode] || colorOrCode;
 
   const filtered = images.filter((img) => {
     if (!img.color && !img.color_code) return includeGeneral;
-    const imgCode = img.color_code?.toUpperCase() || (img.color ? COLOR_TO_CODE[img.color.toLowerCase()] : "");
+    const imgCode = img.color_code?.toUpperCase() || (img.color ? colorCode(img.color) : "");
     const imgName = img.color || (img.color_code ? (CODE_TO_COLOR as Record<string, string>)[img.color_code] : "");
 
     return (

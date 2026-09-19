@@ -211,16 +211,19 @@ test("miscellaneous and bought-out lines roll into total cost", () => {
     { stage_code: "material", unit: "piece", rate: 100, qty: 1, wastage_pct: 0 },
     // Miscellaneous: free-text line, 50 x 2 = 100
     { stage_code: "miscellaneous", unit: "piece", rate: 50, qty: 2, wastage_pct: 0 },
-    // Bought out: 200 x 1 with 25% markup carried in wastage_pct = 250
+    // Bought out: 200 x 1; a stale per-line markup (old sheets) is ignored
     { stage_code: "bought_out", unit: "piece", rate: 200, qty: 1, wastage_pct: 25 },
+    // Untouched placeholder line: qty 0 costs nothing
+    { stage_code: "hardware", unit: "piece", rate: 300, qty: 0, wastage_pct: 0 },
   ];
 
   const totals = calculateCostSheetTotals(lines, 50);
 
   assert.equal(totals.material_total, 100);
-  assert.equal(totals.other_total, 350); // 100 misc + 250 bought out
-  assert.equal(totals.total_cost, 450);
-  assert.equal(totals.calculated_sp, 900); // 450 / (1 - 0.5)
+  assert.equal(totals.hardware_total, 0);
+  assert.equal(totals.other_total, 300); // 100 misc + 200 bought out
+  assert.equal(totals.total_cost, 400);
+  assert.equal(totals.calculated_sp, 800); // 400 / (1 - 0.5)
 });
 
 test("SP = CP / (1 - markup%), and 100%+ markup falls back to cost price", () => {

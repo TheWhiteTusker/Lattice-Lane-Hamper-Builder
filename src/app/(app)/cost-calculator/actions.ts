@@ -5,10 +5,9 @@ import { createClient } from "@/lib/supabase/server";
 import { calculateCostSheetTotals, calculateLineCost } from "@/lib/costing.ts";
 import { describeError } from "@/lib/forms";
 import {
-  formatProductCode,
-  parseProductCode,
   getNextSerialForCategory,
-  STANDARD_PRODUCT_COLORS,
+  codesForColors,
+  type ProductColor,
 } from "@/lib/product-code";
 import type { ProductCostLine } from "@/lib/types";
 
@@ -24,7 +23,6 @@ export type SaveCostSheetPayload = {
   markupPct: number;
   sellingPrice?: number;
   notes?: string | null;
-  createAllColorVariants?: boolean;
   lines: ProductCostLine[];
 };
 
@@ -67,7 +65,7 @@ export async function saveCostSheetAndProduct(payload: SaveCostSheetPayload) {
         unit: l.unit || "sq ft",
         rate: Number(l.rate) || 0,
         duration_minutes: l.duration_minutes != null ? Number(l.duration_minutes) : null,
-        qty: Number(l.qty) || 1,
+        qty: l.qty != null ? Number(l.qty) : 1,
         wastage_pct: Number(l.wastage_pct) || 0,
         calculated_area: calc.calculated_area,
         line_total: calc.line_total,
@@ -84,8 +82,11 @@ export async function saveCostSheetAndProduct(payload: SaveCostSheetPayload) {
     const targetMargin =
       finalSellingPrice > 0 ? (finalSellingPrice - totals.total_cost) / finalSellingPrice : 0;
 
-    // 1. Save / Update Product in Product Master
+    // 1. Save / Update Product in Product Master. Several colours means one
+    // product per colour (LC/0001/WL, LC/0001/BL): this one takes the first
+    // colour, the rest become sibling products in step 3.5.
     let productId = payload.productId;
+    const colors = payload.colors ?? [];
 
     const productValues = {
       code,
@@ -96,7 +97,7 @@ export async function saveCostSheetAndProduct(payload: SaveCostSheetPayload) {
       markup_pct: totals.markup_pct,
       target_margin: targetMargin,
       default_sp: finalSellingPrice,
-      colors: payload.colors || [],
+      colors: colors.slice(0, 1),
       is_active: payload.isActive !== false,
     };
 
@@ -193,42 +194,28 @@ export async function saveCostSheetAndProduct(payload: SaveCostSheetPayload) {
       if (lErr) return { error: `Error saving cost lines: ${describeError(lErr)}` };
     }
 
-    // 3.5. Optionally create / sync all 3 standard color variants (Walnut, Natural, Black)
-    const createdVariants: string[] = [];
-    if (payload.createAllColorVariants) {
-      const parsed = parseProductCode(code);
-      const catCode = parsed.categoryCode || "XX";
-      const serial = parsed.serial || "0001";
-
-      for (const col of STANDARD_PRODUCT_COLORS) {
-        const variantCode = formatProductCode(catCode, serial, col.code);
-        createdVariants.push(variantCode);
-
-        const variantValues = {
-          code: variantCode,
-          name: name,
-          category_id: payload.categoryId || null,
-          source: payload.source || null,
-          cost_price: totals.total_cost,
-          markup_pct: totals.markup_pct,
-          target_margin: targetMargin,
-          default_sp: finalSellingPrice,
-          colors: [col.name],
-          is_active: payload.isActive !== false,
-        };
-
-        const { data: exVariant } = await supabase
-          .from("products")
-          .select("id")
-          .eq("code", variantCode)
-          .maybeSingle();
-
-        if (exVariant) {
-          await supabase.from("products").update(variantValues).eq("id", exVariant.id);
-        } else {
-          await supabase.from("products").insert(variantValues);
-        }
-      }
+    // 3.5. One sibling product per extra colour, same costing and price.
+    // Upserted on code, so re-saving updates rather than duplicates.
+    const variants: { color: string; code: string; id: string }[] = [];
+    if (colors[0] && productId) variants.push({ color: colors[0], code, id: productId });
+    for (const { color, code: variantCode } of codesForColors(code, colors.slice(1))) {
+      if (variantCode === code) continue;
+      const variantValues = { ...productValues, code: variantCode, colors: [color] };
+      const { data: existingVariant } = await supabase
+        .from("products")
+        .select("id")
+        .eq("code", variantCode)
+        .maybeSingle();
+      const { data: saved, error: vErr } = existingVariant
+        ? await supabase
+            .from("products")
+            .update(variantValues)
+            .eq("id", existingVariant.id)
+            .select("id")
+            .single()
+        : await supabase.from("products").insert(variantValues).select("id").single();
+      if (vErr) return { error: `Error saving ${variantCode}: ${describeError(vErr)}` };
+      variants.push({ color, code: variantCode, id: saved.id });
     }
 
     revalidatePath("/cost-calculator");
@@ -240,10 +227,10 @@ export async function saveCostSheetAndProduct(payload: SaveCostSheetPayload) {
       ok: true,
       sheetId,
       productId,
+      variants,
       productCode: code,
       totalCost: totals.total_cost,
       sellingPrice: finalSellingPrice,
-      variants: createdVariants.length > 0 ? createdVariants : undefined,
     };
   } catch (err: unknown) {
     return { error: err instanceof Error ? err.message : String(err) };
@@ -383,12 +370,20 @@ export async function deleteCostVariety(id: string) {
   return { ok: true };
 }
 
-export async function saveProductColors(colors: string[]) {
+/** Saves the colour list and each colour's swatch, used everywhere colours show. */
+export async function saveProductColors(colors: ProductColor[]) {
   const supabase = await createClient();
-  const cleaned = Array.from(new Set(colors.map((c) => c.trim()).filter(Boolean)));
-  const { error } = await supabase
-    .from("app_settings")
-    .upsert({ key: "product_colors", value: cleaned }, { onConflict: "key" });
+  const seen = new Set<string>();
+  const cleaned = colors
+    .map((c) => ({ ...c, name: c.name.trim() }))
+    .filter((c) => c.name && !seen.has(c.name.toLowerCase()) && seen.add(c.name.toLowerCase()));
+  const { error } = await supabase.from("app_settings").upsert(
+    [
+      { key: "product_colors", value: cleaned.map((c) => c.name) },
+      { key: "color_hex", value: Object.fromEntries(cleaned.map((c) => [c.name, c.hex])) },
+    ],
+    { onConflict: "key" },
+  );
   if (error) return { error: describeError(error) };
   revalidatePath("/cost-calculator");
   revalidatePath("/products");
