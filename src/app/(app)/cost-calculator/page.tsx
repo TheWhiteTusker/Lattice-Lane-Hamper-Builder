@@ -206,12 +206,13 @@ export default async function CostCalculatorPage({
       {activeTab === "calculator" ? (
         <CostCalculatorView
           // Fresh state (photos, lines) when switching to another product
-          key={initialProduct?.id ?? "new"}
+          key={`${initialProduct?.id ?? "new"}-${one(params.t)}`}
           stages={nestedStages}
           categories={productCats ?? []}
           products={productsData ?? []}
           productColors={resolveColors(settings.product_colors, settings.color_hex)}
           initialProduct={initialProduct}
+          savedCodes={one(params.saved) || undefined}
           initialSheet={initialSheet}
           initialImages={initialImages}
         />

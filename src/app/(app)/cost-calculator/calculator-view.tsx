@@ -47,33 +47,26 @@ const BOUGHT_OUT = "bought_out";
 const createEmptyLine = (
   stageCode: string,
   categories: CostStageWithHierarchy["categories"],
-  qty = 1,
 ): LineState => {
-  const firstCat = categories[0];
-  const firstSub = firstCat?.subcategories[0];
-  const firstVar = firstSub?.varieties[0];
-
+  // Nothing preselected: the user picks category, subcategory and variety.
   const line: LineState = {
     id: crypto.randomUUID(),
     sheet_id: "",
     tempKey: crypto.randomUUID(),
     stage_code: stageCode,
-    category_name: firstCat?.name ?? "",
-    subcategory_name: firstSub?.name ?? "",
-    variety_name: firstVar?.name ?? "",
-    cost_variety_id: firstVar?.id ?? null,
-    item_name:
-      firstSub && firstVar ? `${firstSub.name} ${firstVar.name}` : firstSub?.name ?? "",
+    category_name: "",
+    subcategory_name: "",
+    variety_name: "",
+    cost_variety_id: null,
+    item_name: "",
     length: null,
     breadth: null,
     dimension_unit: "inch",
-    unit:
-      firstVar?.unit ??
-      (stageCode === "machine" ? "min" : categories.length > 0 ? "sq ft" : "piece"),
-    rate: firstVar?.default_rate ?? 0,
-    qty,
+    unit: stageCode === "machine" ? "min" : categories.length > 0 ? "sq ft" : "piece",
+    rate: 0,
+    qty: 1,
     duration_minutes: stageCode === "machine" ? 15 : null,
-    wastage_pct: firstVar?.default_wastage_pct ?? 0,
+    wastage_pct: 0,
     sort_order: 0,
     calculated_area: 1,
     line_total: 0,
@@ -90,6 +83,7 @@ export function CostCalculatorView({
   initialProduct,
   initialSheet,
   initialImages = [],
+  savedCodes,
 }: {
   stages: CostStageWithHierarchy[];
   categories: Category[];
@@ -98,6 +92,8 @@ export function CostCalculatorView({
   initialProduct?: Product | null;
   initialSheet?: ProductCostSheet | null;
   initialImages?: ProductImage[];
+  /** Codes from the save that reset this page, shown as a banner. */
+  savedCodes?: string;
 }) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -191,9 +187,8 @@ export function CostCalculatorView({
       }));
     }
 
-    // One placeholder line per stage to get started quickly. Qty 0 so a blank
-    // sheet costs nothing until the user fills a line in.
-    return stages.map((s) => createEmptyLine(s.code, s.categories, 0));
+    // One empty row per stage, ready to be filled from the dropdowns.
+    return stages.map((s) => createEmptyLine(s.code, s.categories));
   });
 
   // Lookup map for stages and their categories
@@ -268,46 +263,28 @@ export function CostCalculatorView({
     );
   }
 
-  // When Category changes -> cascade to first Subcategory -> first Variety
-  function handleLineCategoryChange(key: string, stageCode: string, catName: string) {
-    const stage = stageMap.get(stageCode);
-    const cat = stage?.categories.find((c) => c.name === catName);
-    const firstSub = cat?.subcategories[0];
-    const firstVar = firstSub?.varieties[0];
-
+  // Category changed: clear subcategory and variety so each is picked in turn.
+  function handleLineCategoryChange(key: string, catName: string) {
     updateLine(key, {
       category_name: catName,
-      subcategory_name: firstSub?.name ?? "",
-      variety_name: firstVar?.name ?? "",
-      item_name:
-        firstSub && firstVar ? `${firstSub.name} ${firstVar.name}` : firstSub?.name ?? "",
-      cost_variety_id: firstVar?.id ?? null,
-      unit: firstVar?.unit ?? (stageCode === "machine" ? "min" : "sq ft"),
-      rate: firstVar?.default_rate ?? 0,
-      wastage_pct: firstVar?.default_wastage_pct ?? 0,
+      subcategory_name: "",
+      variety_name: "",
+      item_name: "",
+      cost_variety_id: null,
+      rate: 0,
+      wastage_pct: 0,
     });
   }
 
-  // When Subcategory changes (e.g. Birch -> Acacia) -> cascade to first Variety (e.g. 10mm)
-  function handleLineSubcategoryChange(
-    key: string,
-    stageCode: string,
-    catName: string,
-    subName: string,
-  ) {
-    const stage = stageMap.get(stageCode);
-    const cat = stage?.categories.find((c) => c.name === catName);
-    const sub = cat?.subcategories.find((s) => s.name === subName);
-    const firstVar = sub?.varieties[0];
-
+  // Subcategory changed: clear the variety; picking one fills rate and unit.
+  function handleLineSubcategoryChange(key: string, subName: string) {
     updateLine(key, {
       subcategory_name: subName,
-      variety_name: firstVar?.name ?? "",
-      item_name: sub && firstVar ? `${sub.name} ${firstVar.name}` : sub?.name ?? "",
-      cost_variety_id: firstVar?.id ?? null,
-      unit: firstVar?.unit ?? (stageCode === "machine" ? "min" : "sq ft"),
-      rate: firstVar?.default_rate ?? 0,
-      wastage_pct: firstVar?.default_wastage_pct ?? 0,
+      variety_name: "",
+      item_name: subName,
+      cost_variety_id: null,
+      rate: 0,
+      wastage_pct: 0,
     });
   }
 
@@ -548,7 +525,10 @@ export function CostCalculatorView({
         markupPct: num(markupPct),
         sellingPrice: effectiveSp,
         notes: notes.trim() || null,
-        lines: activeLines.map((l) => ({
+        // Skip starter rows left empty
+        lines: activeLines
+          .filter((l) => l.category_name || l.item_name || num(l.rate) > 0)
+          .map((l) => ({
           stage_code: l.stage_code,
           category_name: l.category_name,
           subcategory_name: l.subcategory_name,
@@ -573,6 +553,7 @@ export function CostCalculatorView({
         setFeedback({ error: res.error });
       } else {
         let photoMsg = "";
+        let photosFailed = false;
         const ids: Record<string, string> = Object.fromEntries(
           (res.variants ?? []).map((v) => [v.color, v.id]),
         );
@@ -588,6 +569,7 @@ export function CostCalculatorView({
             added.push(...r.added);
             if (r.error) failed.push(`${colName}: ${r.error}`);
           }
+          photosFailed = failed.length > 0;
           pending.forEach((p) => URL.revokeObjectURL(p.url));
           setPending([]);
           setImages((prev) => [...prev, ...added]);
@@ -596,12 +578,22 @@ export function CostCalculatorView({
             ? ` ${added.length} photo(s) uploaded; failed — ${failed.join("; ")}`
             : ` ${added.length} photo(s) uploaded.`;
         }
+        const savedCodes = res.variants?.length
+          ? res.variants.map((v) => v.code).join(", ")
+          : (res.productCode ?? code.trim());
+
+        // All good: start a fresh, blank calculator. The t param changes the
+        // page key so it remounts even when already on /cost-calculator.
+        if (!photosFailed) {
+          router.push(
+            `/cost-calculator?saved=${encodeURIComponent(savedCodes)}&t=${Date.now()}`,
+          );
+          return;
+        }
+
+        // A photo failed: stay put so the error is visible and can be retried.
         setFeedback({
-          success: `Saved successfully! ${
-            (res.variants?.length ?? 0) > 1
-              ? `Products ${res.variants!.map((v) => v.code).join(", ")}`
-              : `Product ${res.productCode}`
-          } updated with CP ${formatMoney(res.totalCost)} and SP ${formatMoney(res.sellingPrice)}.${photoMsg}`,
+          success: `Saved ${savedCodes} with CP ${formatMoney(res.totalCost)} and SP ${formatMoney(res.sellingPrice)}.${photoMsg}`,
         });
         if (res.productId) setSelectedProductId(res.productId);
       }
@@ -610,6 +602,11 @@ export function CostCalculatorView({
 
   return (
     <div className="space-y-6">
+      {savedCodes && (
+        <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-2.5 text-sm font-medium text-emerald-800">
+          ✓ Saved <span className="font-mono">{savedCodes}</span>. Ready for the next product.
+        </div>
+      )}
       {/* ---------------- PRODUCT DETAILS HEADER ---------------- */}
       <div className="card p-5">
         <div className="flex flex-wrap items-center justify-between gap-4 border-b border-[var(--color-border)] pb-4">
@@ -1044,14 +1041,11 @@ export function CostCalculatorView({
                               <select
                                 value={line.category_name}
                                 onChange={(e) =>
-                                  handleLineCategoryChange(
-                                    line.tempKey,
-                                    stage.code,
-                                    e.target.value,
-                                  )
+                                  handleLineCategoryChange(line.tempKey, e.target.value)
                                 }
                                 className="select text-xs py-1 px-2"
                               >
+                                <option value="">Select category…</option>
                                 {stage.categories.map((c) => (
                                   <option key={c.id} value={c.name}>
                                     {c.name}
@@ -1065,15 +1059,12 @@ export function CostCalculatorView({
                               <select
                                 value={line.subcategory_name ?? ""}
                                 onChange={(e) =>
-                                  handleLineSubcategoryChange(
-                                    line.tempKey,
-                                    stage.code,
-                                    line.category_name,
-                                    e.target.value,
-                                  )
+                                  handleLineSubcategoryChange(line.tempKey, e.target.value)
                                 }
                                 className="select text-xs py-1 px-2 font-medium"
+                                disabled={!line.category_name}
                               >
+                                <option value="">Select…</option>
                                 {availableSubcategories.map((s) => (
                                   <option key={s.id} value={s.name}>
                                     {s.name}
@@ -1096,7 +1087,9 @@ export function CostCalculatorView({
                                   )
                                 }
                                 className="select text-xs py-1 px-2 font-semibold text-[var(--color-brand-dark)]"
+                                disabled={!line.subcategory_name}
                               >
+                                <option value="">Select…</option>
                                 {availableVarieties.map((v) => (
                                   <option key={v.id} value={v.name}>
                                     {v.name}
