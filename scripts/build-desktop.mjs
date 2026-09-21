@@ -34,7 +34,9 @@ fs.rmSync(path.join(STANDALONE, ".env"), { force: true });
 console.log("✓ Standalone server ready");
 
 console.log("\n=== [4/4] Packaging Windows installer with electron-builder ===");
-execSync("pnpm exec electron-builder --win", { cwd: ROOT, stdio: "inherit" });
+// --publish never: in CI electron-builder otherwise tries GitHub Releases and
+// fails without GH_TOKEN. Releases go to R2 via `pnpm publish:desktop`.
+execSync("pnpm exec electron-builder --win --publish never", { cwd: ROOT, stdio: "inherit" });
 console.log("\n✨ Done. Installer is in dist/.");
 
 // The installed app compares its version with this on launch (electron/main.cjs).
