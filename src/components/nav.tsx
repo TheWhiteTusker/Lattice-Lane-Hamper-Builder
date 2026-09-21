@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
@@ -17,6 +17,13 @@ export function Nav({ profile, desktop }: { profile: Profile; desktop: boolean }
   const pathname = usePathname();
   const router = useRouter();
   const [checkingUpdate, setCheckingUpdate] = useState(false);
+  const [isDesktopClient, setIsDesktopClient] = useState(desktop);
+
+  useEffect(() => {
+    if (typeof window !== "undefined" && (window as unknown as { electron?: { isDesktop?: boolean } }).electron?.isDesktop) {
+      setIsDesktopClient(true);
+    }
+  }, []);
 
   async function checkUpdates() {
     setCheckingUpdate(true);
@@ -93,7 +100,7 @@ export function Nav({ profile, desktop }: { profile: Profile; desktop: boolean }
         </nav>
 
         <div className="flex shrink-0 items-center gap-3 text-sm">
-          {!desktop ? (
+          {!isDesktopClient ? (
             // Plain <a>: a file download, not a page for the router to prefetch.
             <a
               href="/updates/Lattice-Lane-Setup.exe"
@@ -106,8 +113,21 @@ export function Nav({ profile, desktop }: { profile: Profile; desktop: boolean }
               type="button"
               onClick={checkUpdates}
               disabled={checkingUpdate}
-              className="btn rounded-full border border-white/30 text-white hover:bg-white/10 text-xs px-3 py-1"
+              className="btn rounded-full border border-white/30 text-white hover:bg-white/10 text-xs px-3 py-1 flex items-center gap-1.5"
             >
+              <svg
+                className={`h-3.5 w-3.5 ${checkingUpdate ? "animate-spin" : ""}`}
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+                />
+              </svg>
               {checkingUpdate ? "Checking…" : "Check for updates"}
             </button>
           )}
