@@ -4,7 +4,8 @@
   "main": "electron/main.cjs",
   "scripts": {
     "dev": "next dev -p 3015",
-    "build": "next build",
+    "build": "opennextjs-cloudflare build",
+    "build:next": "next build",
     "start": "next start -p 3015",
     "lint": "eslint",
     "test": "node --test \"src/**/*.test.ts\"",

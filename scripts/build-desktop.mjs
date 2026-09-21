@@ -18,7 +18,7 @@ console.log("✓ Icon verified");
 
 console.log("\n=== [2/4] Building Next.js in standalone mode ===");
 fs.rmSync(STANDALONE, { recursive: true, force: true });
-execSync("pnpm run build", {
+execSync("pnpm run build:next", {
   cwd: ROOT,
   stdio: "inherit",
   env: { ...process.env, BUILD_STANDALONE: "true" },
