@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useActionState, useEffect, useState } from "react";
 import {
   saveCompany,
   saveList,
@@ -430,6 +430,10 @@ export function UpdateAppButton() {
   const [state, action, pending] = useActionState(publishDesktopApp, {});
   const [checking, setChecking] = useState(false);
   const [checkResult, setCheckResult] = useState<string | null>(null);
+  // Publishing needs the Worker's GITHUB_TOKEN, which the desktop app's local
+  // server never has, so the button only shows on the website.
+  const [isDesktop, setIsDesktop] = useState(false);
+  useEffect(() => setIsDesktop("electron" in window), []);
 
   async function handleCheckForUpdates() {
     setChecking(true);
@@ -479,16 +483,18 @@ export function UpdateAppButton() {
       >
         {checking ? "Checking…" : "Check for updates"}
       </button>
-      <form action={action} className="inline-flex items-center gap-2">
-        <button
-          type="submit"
-          className="btn-secondary"
-          disabled={pending || state.ok}
-          title="Trigger GitHub Actions to compile current web version into Windows installer"
-        >
-          {pending ? "Starting…" : "Package web into app release"}
-        </button>
-      </form>
+      {!isDesktop && (
+        <form action={action} className="inline-flex items-center gap-2">
+          <button
+            type="submit"
+            className="btn-secondary"
+            disabled={pending || state.ok}
+            title="Trigger GitHub Actions to compile current web version into Windows installer"
+          >
+            {pending ? "Starting…" : "Package web into app release"}
+          </button>
+        </form>
+      )}
       {checkResult && (
         <span className="text-xs text-[var(--color-brand-dark)] font-medium">
           {checkResult}
