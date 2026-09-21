@@ -1,6 +1,6 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "lattice-lane-hamper-builder",
+  "name": "hamper-builder",
 
   // Built by `opennextjs-cloudflare build`, which turns .next into a Worker.
   // Deploying .next directly does not work, which is why wrangler kept trying

@@ -501,7 +501,7 @@ export function UpdateAppButton() {
       )}
       {state.ok && (
         <a
-          href="https://github.com/TheWhiteTusker/Lattice-Lane-Hamper-Builder/actions/workflows/desktop.yml"
+          href="https://github.com/TheWhiteTusker/hamper-builder/actions/workflows/desktop.yml"
           target="_blank"
           rel="noreferrer"
           className="text-sm text-green-800 underline"

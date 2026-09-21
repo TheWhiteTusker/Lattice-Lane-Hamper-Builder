@@ -77,6 +77,7 @@ async function startServer() {
 // app offers any newer version and installs it silently, so nobody reinstalls
 // by hand.
 const UPDATE_SERVERS = [
+  "https://hamper-builder.latticelane.workers.dev/updates/",
   "https://lattice-lane-hamper-builder.latticelane.workers.dev/updates/",
   "https://lattice-lane-hamper-builder.digital-9f6.workers.dev/updates/",
 ];

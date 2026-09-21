@@ -260,7 +260,7 @@ export async function publishDesktopApp(): Promise<ActionState> {
   if (!token) return { error: "GITHUB_TOKEN is not set on the website." };
 
   const res = await fetch(
-    "https://api.github.com/repos/TheWhiteTusker/Lattice-Lane-Hamper-Builder/actions/workflows/desktop.yml/dispatches",
+    "https://api.github.com/repos/TheWhiteTusker/hamper-builder/actions/workflows/desktop.yml/dispatches",
     {
       method: "POST",
       headers: {
