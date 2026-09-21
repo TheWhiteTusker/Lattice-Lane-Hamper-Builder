@@ -73,9 +73,9 @@ async function startServer() {
   await waitForServer(appUrl);
 }
 
-// Releases are published to the website (pnpm publish:desktop). On launch the
-// app offers any newer version and installs it silently, so nobody reinstalls
-// by hand.
+// Releases are published to the website (pnpm publish:desktop). On launch, and
+// from "Check for updates", the app asks before downloading, shows progress,
+// then offers Install now / Later — so nobody reinstalls by hand.
 const UPDATE_SERVERS = [
   "https://hamper-builder.latticelane.workers.dev/updates/",
   "https://lattice-lane-hamper-builder.latticelane.workers.dev/updates/",
@@ -100,9 +100,111 @@ const isNewer = (a, b) => {
   return false;
 };
 
+// A downloaded-but-not-installed update waits here until the user picks
+// "Install now"; every launch asks again until they do.
+const UPDATE_DIR = () => path.join(app.getPath("userData"), "updates");
+const PENDING = () => path.join(UPDATE_DIR(), "pending.json");
+
+function readPending() {
+  try {
+    const p = JSON.parse(fs.readFileSync(PENDING(), "utf8"));
+    if (isNewer(p.version, app.getVersion()) && fs.existsSync(p.file)) return p;
+  } catch {
+    // no pending update
+  }
+  // Already installed, or never downloaded: clear any leftover installer.
+  fs.rmSync(UPDATE_DIR(), { recursive: true, force: true });
+  return null;
+}
+
+async function askInstall(p) {
+  const { response } = await dialog.showMessageBox(mainWindow, {
+    type: "info",
+    buttons: ["Install now", "Later"],
+    defaultId: 0,
+    cancelId: 1,
+    title: "Update ready",
+    message: `Lattice Lane ${p.version} is downloaded and ready to install.`,
+    detail: "Install now restarts the app on the new version. Later asks again the next time you open the app.",
+  });
+  if (response !== 0) return { status: "deferred", version: p.version };
+  // Silent install over the existing one, then relaunch.
+  spawn(p.file, ["/S", "--force-run"], { detached: true, stdio: "ignore" }).unref();
+  app.quit();
+  return { status: "updating", version: p.version };
+}
+
+async function download(base, version) {
+  const res = await fetch(base + "Lattice-Lane-Setup.exe", { cache: "no-store" });
+  if (!res.ok) throw new Error(`Download failed (${res.status})`);
+  const total = Number(res.headers.get("content-length")) || 0;
+
+  fs.mkdirSync(UPDATE_DIR(), { recursive: true });
+  const file = path.join(UPDATE_DIR(), `Lattice-Lane-Setup-${version}.exe`);
+  const win = new BrowserWindow({
+    parent: mainWindow,
+    modal: true,
+    width: 440,
+    height: 220,
+    frame: false,
+    resizable: false,
+    minimizable: false,
+  });
+  await win.loadURL(
+    page(
+      "Downloading update",
+      `<h2>Downloading update</h2><p>Lattice Lane ${version}</p>
+       <div style="background:#e8e6e1;border-radius:4px;height:8px;overflow:hidden">
+         <div id="bar" style="background:#54655b;height:8px;width:0"></div></div>
+       <p id="pct">0%</p>`,
+    ),
+  );
+
+  const out = fs.createWriteStream(file);
+  let got = 0;
+  let shown = null;
+  try {
+    for await (const chunk of res.body) {
+      got += chunk.length;
+      if (!out.write(chunk)) await new Promise((r) => out.once("drain", r));
+      const label = total ? `${Math.floor((got / total) * 100)}%` : `${Math.round(got / 1e6)} MB`;
+      if (label !== shown) {
+        shown = label;
+        mainWindow?.setProgressBar(total ? got / total : 2);
+        win.webContents
+          .executeJavaScript(
+            `document.getElementById("pct").textContent=${JSON.stringify(label)};` +
+              (total ? `document.getElementById("bar").style.width=${JSON.stringify(label)};` : ""),
+          )
+          .catch(() => {});
+      }
+    }
+    await new Promise((resolve, reject) => out.end((err) => (err ? reject(err) : resolve())));
+    if (total && got !== total) throw new Error("Download was incomplete");
+  } catch (error) {
+    out.destroy();
+    fs.rmSync(file, { force: true });
+    throw error;
+  } finally {
+    win.destroy();
+    mainWindow?.setProgressBar(-1);
+  }
+
+  const p = { version, file };
+  fs.writeFileSync(PENDING(), JSON.stringify(p));
+  return p;
+}
+
+let checking = false;
+
 async function checkForUpdate(manual = false) {
   if (!app.isPackaged && !manual) return { status: "dev" };
+  if (checking) return { status: "busy" };
+  checking = true;
   try {
+    const pending = readPending();
+    if (pending) return await askInstall(pending);
+
     const updateResult = await fetchFromUpdates("latest.json");
     if (!updateResult) {
       if (manual) {
@@ -127,36 +229,31 @@ async function checkForUpdate(manual = false) {
     }
 
     const { response } = await dialog.showMessageBox(mainWindow, {
-      type: "info",
-      buttons: ["Update now", "Later"],
+      type: "question",
+      buttons: ["Update", "Not now"],
+      defaultId: 0,
+      cancelId: 1,
       title: "Update available",
       message: `Lattice Lane ${version} is available (you have ${app.getVersion()}).`,
-      detail: "It downloads in the background, then the app restarts on the new version.",
+      detail: "Would you like to update?",
     });
     if (response !== 0) return { status: "deferred", version };
 
-    mainWindow?.setProgressBar(2); // indeterminate, on the taskbar icon
-    const exe = await fetch(updateResult.base + "Lattice-Lane-Setup.exe");
-    if (!exe.ok) throw new Error(`Download failed (${exe.status})`);
-    const file = path.join(app.getPath("temp"), "Lattice-Lane-Setup.exe");
-    fs.writeFileSync(file, Buffer.from(await exe.arrayBuffer()));
-
-    // Silent install over the existing one, then relaunch.
-    spawn(file, ["/S", "--force-run"], { detached: true, stdio: "ignore" }).unref();
-    app.quit();
-    return { status: "updating", version };
+    return await askInstall(await download(updateResult.base, version));
   } catch (error) {
     // Offline or a bad download: keep working, try again next launch.
-    mainWindow?.setProgressBar(-1);
-    console.error("Update check failed:", error);
+    console.error("Update failed:", error);
     if (manual) {
       await dialog.showMessageBox(mainWindow, {
         type: "error",
-        title: "Update Check Failed",
-        message: "Could not reach update server. Please check your internet connection.",
+        title: "Update failed",
+        message: `The update could not be completed: ${error.message}`,
+        detail: "Check your internet connection and try again.",
       });
     }
     return { status: "error", message: error.message };
+  } finally {
+    checking = false;
   }
 }
 

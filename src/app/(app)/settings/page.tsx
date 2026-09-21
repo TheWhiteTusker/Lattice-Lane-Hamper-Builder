@@ -24,7 +24,8 @@ export default async function SettingsPage() {
     supabase.from("profiles").select("*").order("created_at").returns<Profile[]>(),
   ]);
 
-  const nextSortOrder = (categories ?? []).reduce((max, c) => Math.max(max, c.sort_order), -1) + 1;
+  const desktop = process.env.LATTICE_DESKTOP === "1";
+  const nextSortOrder =(categories ?? []).reduce((max, c) => Math.max(max, c.sort_order), -1) + 1;
 
   return (
     <>
@@ -35,7 +36,8 @@ export default async function SettingsPage() {
         <Link href="/admin/refresh-prices" className="btn-secondary">
           Refresh prices
         </Link>
-        <UpdateAppButton />
+        {/* LATTICE_DESKTOP is set by electron/main.cjs. */}
+        <UpdateAppButton desktop={desktop} />
       </PageHeader>
 
       <div className="grid gap-4 lg:grid-cols-2">
@@ -153,9 +155,13 @@ export default async function SettingsPage() {
         <p className="font-semibold text-[var(--color-ink)]">
           Lattice Lane Hamper Builder
         </p>
-        <p className="mt-1">
-          Version <span className="font-mono font-medium text-[var(--color-brand)]">v{APP_VERSION}</span>
-        </p>
+        {/* Only the desktop app has a real version: CI bumps package.json for
+            the desktop build alone, so the website would always read 0.2.4. */}
+        {desktop && (
+          <p className="mt-1">
+            Version <span className="font-mono font-medium text-[var(--color-brand)]">v{APP_VERSION}</span>
+          </p>
+        )}
       </footer>
     </>
   );

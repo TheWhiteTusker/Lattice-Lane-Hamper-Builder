@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useEffect, useState, useSyncExternalStore } from "react";
+import { useActionState, useEffect, useState } from "react";
 import {
   saveCompany,
   saveList,
@@ -9,11 +9,12 @@ import {
   deleteCategory,
   setUserRole,
   publishDesktopApp,
+  desktopReleaseStatus,
+  type ReleaseStatus,
 } from "./actions";
 import type { ActionState } from "@/lib/forms";
 import type { Category, CompanySettings, Profile, UserRole } from "@/lib/types";
 import { round2 } from "@/lib/pricing";
-import { APP_VERSION } from "@/lib/version";
 
 function Status({ state }: { state: ActionState }) {
   if (state.error)
@@ -426,93 +427,118 @@ export function UserRoleForm({ profile, isSelf }: { profile: Profile; isSelf: bo
   );
 }
 
-export function UpdateAppButton() {
-  const [state, action, pending] = useActionState(publishDesktopApp, {});
-  const [checking, setChecking] = useState(false);
-  const [checkResult, setCheckResult] = useState<string | null>(null);
-  // The desktop app checks for updates; the website publishes them. Publishing
-  // needs the Worker's GITHUB_TOKEN, which the app's local server never has.
-  const isDesktop = useSyncExternalStore(
-    () => () => {},
-    () => "electron" in window,
-    () => false,
-  );
-  // The website's package.json version is never bumped (CI bumps it only for
-  // the desktop build), so on the web show the latest release instead.
-  const [released, setReleased] = useState<string | null>(null);
-  useEffect(() => {
-    if (isDesktop) return;
-    fetch("/updates/latest.json", { cache: "no-store" })
-      .then((r) => (r.ok ? r.json() : null))
-      .then((j) => j && setReleased(j.version))
-      .catch(() => {});
-  }, [isDesktop]);
+const STEP_LABELS: Record<string, string> = {
+  "Run pnpm install --frozen-lockfile": "Installing dependencies",
+  "Run pnpm build:desktop": "Building the app",
+  "Run pnpm publish:desktop": "Publishing",
+};
 
-  async function handleCheckForUpdates() {
+type ElectronBridge = { electron: { checkForUpdates: () => Promise<unknown> } };
+
+/**
+ * Website: starts a desktop release and shows its progress. Desktop app: checks
+ * for updates; the prompts, download progress and Install now / Later all come
+ * from electron/main.cjs. Publishing needs the Worker's GITHUB_TOKEN, which the
+ * app's local server never has, hence the split.
+ */
+export function UpdateAppButton({ desktop }: { desktop: boolean }) {
+  return desktop ? <CheckForUpdatesButton /> : <PublishReleaseButton />;
+}
+
+function CheckForUpdatesButton() {
+  const [checking, setChecking] = useState(false);
+
+  async function check() {
     setChecking(true);
-    setCheckResult(null);
     try {
-      const res = await (
-        window as unknown as { electron: { checkForUpdates: () => Promise<{ status: string; version?: string; message?: string }> } }
-      ).electron.checkForUpdates();
-      if (res?.status === "up-to-date") {
-        setCheckResult(`App is up to date (v${res.version || APP_VERSION}).`);
-      }
-    } catch {
-      setCheckResult("Check failed. Verify network connection.");
+      await (window as unknown as ElectronBridge).electron.checkForUpdates();
     } finally {
       setChecking(false);
     }
   }
 
   return (
+    <button type="button" onClick={check} className="btn-secondary" disabled={checking}>
+      {checking ? "Checking…" : "Check for updates"}
+    </button>
+  );
+}
+
+function PublishReleaseButton() {
+  const [status, setStatus] = useState<ReleaseStatus | null>(null);
+  // When this page started a release. Runs created before it are an earlier
+  // release, not this click's result (30s allows for clock skew with GitHub).
+  const [since, setSince] = useState<number | null>(null);
+  const [state, action, pending] = useActionState(async () => {
+    const result = await publishDesktopApp();
+    if (result.ok) setSince(Date.now() - 30_000);
+    return result;
+  }, {});
+
+  const isFresh = (s: ReleaseStatus | null) =>
+    since !== null && !!s?.createdAt && Date.parse(s.createdAt) >= since;
+
+  // Poll while a release is running, including one started elsewhere, and
+  // while waiting for a just-dispatched run to appear.
+  useEffect(() => {
+    let stop = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    async function poll() {
+      const s = await desktopReleaseStatus().catch(() => null);
+      if (stop) return;
+      setStatus(s);
+      const waiting = since !== null && !(s?.createdAt && Date.parse(s.createdAt) >= since);
+      if (s?.state === "running" || waiting) timer = setTimeout(poll, 5000);
+    }
+    poll();
+    return () => {
+      stop = true;
+      clearTimeout(timer);
+    };
+  }, [since]);
+
+  const running = status?.state === "running";
+  const fresh = isFresh(status);
+  const starting = since !== null && !fresh;
+
+  return (
     <div className="flex flex-wrap items-center gap-2.5">
-      {(isDesktop || released) && (
-        <span className="rounded bg-slate-100 px-2 py-1 font-mono text-xs font-semibold text-[var(--color-muted)]">
-          {isDesktop ? `v${APP_VERSION}` : `Latest release v${released}`}
-        </span>
-      )}
-      {isDesktop && (
+      <form action={action}>
         <button
-          type="button"
-          onClick={handleCheckForUpdates}
+          type="submit"
           className="btn-secondary"
-          disabled={checking}
+          disabled={pending || running || starting}
+          title="Trigger GitHub Actions to compile current web version into Windows installer"
         >
-          {checking ? "Checking…" : "Check for updates"}
+          {pending ? "Starting…" : "Package web into app release"}
         </button>
+      </form>
+      {starting && !running && <span className="text-xs text-[var(--color-muted)]">Starting on GitHub…</span>}
+      {running && (
+        <div className="flex items-center gap-2" role="status" aria-live="polite">
+          <div className="h-2 w-32 overflow-hidden rounded bg-slate-200">
+            <div
+              className="h-2 bg-[var(--color-brand)] transition-[width] duration-1000"
+              style={{ width: `${status.percent}%` }}
+            />
+          </div>
+          <span className="text-xs text-[var(--color-muted)]">
+            Packaging {status.percent}% · {(status.step && STEP_LABELS[status.step]) ?? "Preparing"}
+          </span>
+        </div>
       )}
-      {!isDesktop && (
-        <form action={action} className="inline-flex items-center gap-2">
-          <button
-            type="submit"
-            className="btn-secondary"
-            disabled={pending || state.ok}
-            title="Trigger GitHub Actions to compile current web version into Windows installer"
-          >
-            {pending ? "Starting…" : "Package web into app release"}
-          </button>
-        </form>
+      {fresh && status?.state === "success" && (
+        <span className="text-sm text-green-800">Released. Everyone&rsquo;s app will offer the update.</span>
       )}
-      {checkResult && (
-        <span className="text-xs text-[var(--color-brand-dark)] font-medium">
-          {checkResult}
-        </span>
+      {fresh && status?.state === "failure" && (
+        <a href={status.url} target="_blank" rel="noreferrer" className="text-sm text-red-700 underline">
+          Packaging failed. See the log on GitHub
+        </a>
       )}
       {state.error && (
         <span role="alert" className="text-sm text-red-700">
           {state.error}
         </span>
-      )}
-      {state.ok && (
-        <a
-          href="https://github.com/TheWhiteTusker/hamper-builder/actions/workflows/desktop.yml"
-          target="_blank"
-          rel="noreferrer"
-          className="text-sm text-green-800 underline"
-        >
-          Packaging new release (~10 min), then everyone&rsquo;s app offers the update
-        </a>
       )}
     </div>
   );
