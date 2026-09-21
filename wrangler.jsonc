@@ -2,10 +2,11 @@
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "hamper-builder",
 
-  // Built by `opennextjs-cloudflare build`, which turns .next into a Worker.
-  // Deploying .next directly does not work, which is why wrangler kept trying
-  // to migrate the project on every build.
-  "main": ".open-next/worker.js",
+  // Wraps .open-next/worker.js, built by `opennextjs-cloudflare build`, which
+  // turns .next into a Worker. Deploying .next directly does not work, which is
+  // why wrangler kept trying to migrate the project on every build. The wrapper
+  // serves /updates/* straight from R2 (see worker.mjs).
+  "main": "worker.mjs",
 
   "compatibility_date": "2026-09-03",
 
