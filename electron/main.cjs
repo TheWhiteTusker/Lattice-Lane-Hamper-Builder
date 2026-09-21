@@ -1,4 +1,4 @@
-const { app, BrowserWindow, dialog, shell, utilityProcess } = require("electron");
+const { app, BrowserWindow, dialog, shell, utilityProcess, ipcMain } = require("electron");
 const { spawn } = require("child_process");
 const path = require("path");
 const http = require("http");
@@ -84,13 +84,31 @@ const isNewer = (a, b) => {
   return false;
 };
 
-async function checkForUpdate() {
-  if (!app.isPackaged) return;
+async function checkForUpdate(manual = false) {
+  if (!app.isPackaged && !manual) return { status: "dev" };
   try {
     const res = await fetch(UPDATES + "latest.json", { cache: "no-store" });
-    if (!res.ok) return;
+    if (!res.ok) {
+      if (manual) {
+        await dialog.showMessageBox(mainWindow, {
+          type: "error",
+          title: "Update Check Failed",
+          message: `Could not check for updates (${res.status}).`,
+        });
+      }
+      return { status: "error", message: `HTTP ${res.status}` };
+    }
     const { version } = await res.json();
-    if (!isNewer(version, app.getVersion())) return;
+    if (!isNewer(version, app.getVersion())) {
+      if (manual) {
+        await dialog.showMessageBox(mainWindow, {
+          type: "info",
+          title: "Up to date",
+          message: `You are on the latest version of Lattice Lane (v${app.getVersion()}).`,
+        });
+      }
+      return { status: "up-to-date", version };
+    }
 
     const { response } = await dialog.showMessageBox(mainWindow, {
       type: "info",
@@ -99,7 +117,7 @@ async function checkForUpdate() {
       message: `Lattice Lane ${version} is available (you have ${app.getVersion()}).`,
       detail: "It downloads in the background, then the app restarts on the new version.",
     });
-    if (response !== 0) return;
+    if (response !== 0) return { status: "deferred", version };
 
     mainWindow?.setProgressBar(2); // indeterminate, on the taskbar icon
     const exe = await fetch(UPDATES + "Lattice-Lane-Setup.exe");
@@ -110,12 +128,23 @@ async function checkForUpdate() {
     // Silent install over the existing one, then relaunch.
     spawn(file, ["/S", "--force-run"], { detached: true, stdio: "ignore" }).unref();
     app.quit();
+    return { status: "updating", version };
   } catch (error) {
     // Offline or a bad download: keep working, try again next launch.
     mainWindow?.setProgressBar(-1);
     console.error("Update check failed:", error);
+    if (manual) {
+      await dialog.showMessageBox(mainWindow, {
+        type: "error",
+        title: "Update Check Failed",
+        message: "Could not reach update server. Please check your internet connection.",
+      });
+    }
+    return { status: "error", message: error.message };
   }
 }
+
+ipcMain.handle("check-for-updates", async () => checkForUpdate(true));
 
 function createWindow() {
   const ico = path.join(__dirname, "..", "build", "icon.ico");

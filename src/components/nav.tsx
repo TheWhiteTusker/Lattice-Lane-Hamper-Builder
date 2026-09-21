@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
@@ -15,6 +16,28 @@ const ROLE_LABEL: Record<Profile["role"], string> = {
 export function Nav({ profile, desktop }: { profile: Profile; desktop: boolean }) {
   const pathname = usePathname();
   const router = useRouter();
+  const [checkingUpdate, setCheckingUpdate] = useState(false);
+
+  async function checkUpdates() {
+    setCheckingUpdate(true);
+    try {
+      if (typeof window !== "undefined" && (window as unknown as { electron?: { checkForUpdates?: () => Promise<void> } }).electron?.checkForUpdates) {
+        await (window as unknown as { electron: { checkForUpdates: () => Promise<void> } }).electron.checkForUpdates();
+      } else {
+        const res = await fetch("/updates/latest.json", { cache: "no-store" });
+        if (res.ok) {
+          const { version } = await res.json();
+          alert(`Latest available desktop version is v${version}`);
+        } else {
+          alert("Could not reach update server.");
+        }
+      }
+    } catch {
+      alert("Update check failed. Please check your internet connection.");
+    } finally {
+      setCheckingUpdate(false);
+    }
+  }
 
   const links = [
     { href: "/", label: "Dashboard" },
@@ -70,7 +93,7 @@ export function Nav({ profile, desktop }: { profile: Profile; desktop: boolean }
         </nav>
 
         <div className="flex shrink-0 items-center gap-3 text-sm">
-          {!desktop && (
+          {!desktop ? (
             // Plain <a>: a file download, not a page for the router to prefetch.
             <a
               href="/updates/Lattice-Lane-Setup.exe"
@@ -78,6 +101,15 @@ export function Nav({ profile, desktop }: { profile: Profile; desktop: boolean }
             >
               Download app
             </a>
+          ) : (
+            <button
+              type="button"
+              onClick={checkUpdates}
+              disabled={checkingUpdate}
+              className="btn rounded-full border border-white/30 text-white hover:bg-white/10 text-xs px-3 py-1"
+            >
+              {checkingUpdate ? "Checking…" : "Check for updates"}
+            </button>
           )}
           <span className="text-white/75">
             {profile.full_name || "Account"}

@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 import {
   saveCompany,
   saveList,
@@ -428,15 +428,72 @@ export function UserRoleForm({ profile, isSelf }: { profile: Profile; isSelf: bo
 
 export function UpdateAppButton() {
   const [state, action, pending] = useActionState(publishDesktopApp, {});
+  const [checking, setChecking] = useState(false);
+  const [checkResult, setCheckResult] = useState<string | null>(null);
+
+  async function handleCheckForUpdates() {
+    setChecking(true);
+    setCheckResult(null);
+    try {
+      if (
+        typeof window !== "undefined" &&
+        (window as unknown as { electron?: { checkForUpdates?: () => Promise<{ status: string; version?: string; message?: string }> } })
+          .electron?.checkForUpdates
+      ) {
+        const res = await (
+          window as unknown as { electron: { checkForUpdates: () => Promise<{ status: string; version?: string; message?: string }> } }
+        ).electron.checkForUpdates();
+        if (res?.status === "up-to-date") {
+          setCheckResult(`App is up to date (v${res.version || APP_VERSION}).`);
+        }
+      } else {
+        const res = await fetch("/updates/latest.json", { cache: "no-store" });
+        if (res.ok) {
+          const { version } = await res.json();
+          if (version === APP_VERSION) {
+            setCheckResult(`App is up to date (v${APP_VERSION}).`);
+          } else {
+            setCheckResult(`Newer version v${version} available (current: v${APP_VERSION}).`);
+          }
+        } else {
+          setCheckResult(`Could not check update (${res.status}).`);
+        }
+      }
+    } catch {
+      setCheckResult("Check failed. Verify network connection.");
+    } finally {
+      setChecking(false);
+    }
+  }
 
   return (
-    <form action={action} className="flex items-center gap-2.5">
+    <div className="flex flex-wrap items-center gap-2.5">
       <span className="rounded bg-slate-100 px-2 py-1 font-mono text-xs font-semibold text-[var(--color-muted)]">
         v{APP_VERSION}
       </span>
-      <button type="submit" className="btn-secondary" disabled={pending || state.ok}>
-        {pending ? "Starting…" : "Update the app"}
+      <button
+        type="button"
+        onClick={handleCheckForUpdates}
+        className="btn-secondary"
+        disabled={checking}
+      >
+        {checking ? "Checking…" : "Check for updates"}
       </button>
+      <form action={action} className="inline-flex items-center gap-2">
+        <button
+          type="submit"
+          className="btn-secondary"
+          disabled={pending || state.ok}
+          title="Trigger GitHub Actions to compile current web version into Windows installer"
+        >
+          {pending ? "Starting…" : "Package web into app release"}
+        </button>
+      </form>
+      {checkResult && (
+        <span className="text-xs text-[var(--color-brand-dark)] font-medium">
+          {checkResult}
+        </span>
+      )}
       {state.error && (
         <span role="alert" className="text-sm text-red-700">
           {state.error}
@@ -449,9 +506,9 @@ export function UpdateAppButton() {
           rel="noreferrer"
           className="text-sm text-green-800 underline"
         >
-          Building (~10 min), then everyone&rsquo;s app offers the update
+          Packaging new release (~10 min), then everyone&rsquo;s app offers the update
         </a>
       )}
-    </form>
+    </div>
   );
 }

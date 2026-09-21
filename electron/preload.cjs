@@ -1,4 +1,7 @@
 // Preload script for Lattice Lane Desktop
-window.addEventListener("DOMContentLoaded", () => {
-  // Desktop environment initialized
+const { contextBridge, ipcRenderer } = require("electron");
+
+contextBridge.exposeInMainWorld("electron", {
+  isDesktop: true,
+  checkForUpdates: () => ipcRenderer.invoke("check-for-updates"),
 });
