@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useEffect, useState } from "react";
+import { useActionState, useEffect, useState, useSyncExternalStore } from "react";
 import {
   saveCompany,
   saveList,
@@ -430,38 +430,33 @@ export function UpdateAppButton() {
   const [state, action, pending] = useActionState(publishDesktopApp, {});
   const [checking, setChecking] = useState(false);
   const [checkResult, setCheckResult] = useState<string | null>(null);
-  // Publishing needs the Worker's GITHUB_TOKEN, which the desktop app's local
-  // server never has, so the button only shows on the website.
-  const [isDesktop, setIsDesktop] = useState(false);
-  useEffect(() => setIsDesktop("electron" in window), []);
+  // The desktop app checks for updates; the website publishes them. Publishing
+  // needs the Worker's GITHUB_TOKEN, which the app's local server never has.
+  const isDesktop = useSyncExternalStore(
+    () => () => {},
+    () => "electron" in window,
+    () => false,
+  );
+  // The website's package.json version is never bumped (CI bumps it only for
+  // the desktop build), so on the web show the latest release instead.
+  const [released, setReleased] = useState<string | null>(null);
+  useEffect(() => {
+    if (isDesktop) return;
+    fetch("/updates/latest.json", { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((j) => j && setReleased(j.version))
+      .catch(() => {});
+  }, [isDesktop]);
 
   async function handleCheckForUpdates() {
     setChecking(true);
     setCheckResult(null);
     try {
-      if (
-        typeof window !== "undefined" &&
-        (window as unknown as { electron?: { checkForUpdates?: () => Promise<{ status: string; version?: string; message?: string }> } })
-          .electron?.checkForUpdates
-      ) {
-        const res = await (
-          window as unknown as { electron: { checkForUpdates: () => Promise<{ status: string; version?: string; message?: string }> } }
-        ).electron.checkForUpdates();
-        if (res?.status === "up-to-date") {
-          setCheckResult(`App is up to date (v${res.version || APP_VERSION}).`);
-        }
-      } else {
-        const res = await fetch("/updates/latest.json", { cache: "no-store" });
-        if (res.ok) {
-          const { version } = await res.json();
-          if (version === APP_VERSION) {
-            setCheckResult(`App is up to date (v${APP_VERSION}).`);
-          } else {
-            setCheckResult(`Newer version v${version} available (current: v${APP_VERSION}).`);
-          }
-        } else {
-          setCheckResult(`Could not check update (${res.status}).`);
-        }
+      const res = await (
+        window as unknown as { electron: { checkForUpdates: () => Promise<{ status: string; version?: string; message?: string }> } }
+      ).electron.checkForUpdates();
+      if (res?.status === "up-to-date") {
+        setCheckResult(`App is up to date (v${res.version || APP_VERSION}).`);
       }
     } catch {
       setCheckResult("Check failed. Verify network connection.");
@@ -472,17 +467,21 @@ export function UpdateAppButton() {
 
   return (
     <div className="flex flex-wrap items-center gap-2.5">
-      <span className="rounded bg-slate-100 px-2 py-1 font-mono text-xs font-semibold text-[var(--color-muted)]">
-        v{APP_VERSION}
-      </span>
-      <button
-        type="button"
-        onClick={handleCheckForUpdates}
-        className="btn-secondary"
-        disabled={checking}
-      >
-        {checking ? "Checking…" : "Check for updates"}
-      </button>
+      {(isDesktop || released) && (
+        <span className="rounded bg-slate-100 px-2 py-1 font-mono text-xs font-semibold text-[var(--color-muted)]">
+          {isDesktop ? `v${APP_VERSION}` : `Latest release v${released}`}
+        </span>
+      )}
+      {isDesktop && (
+        <button
+          type="button"
+          onClick={handleCheckForUpdates}
+          className="btn-secondary"
+          disabled={checking}
+        >
+          {checking ? "Checking…" : "Check for updates"}
+        </button>
+      )}
       {!isDesktop && (
         <form action={action} className="inline-flex items-center gap-2">
           <button
