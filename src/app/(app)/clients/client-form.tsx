@@ -18,7 +18,7 @@ export function ClientForm({ client, canDelete }: { client?: Client; canDelete: 
   function fetchDetails() {
     startFetch(async () => {
       const result = await lookupGstin(gstin);
-      setLookupError(result.error ?? "");
+      setLookupError(result.error ? String(result.error) : "");
       if (result.details) {
         setName(result.details.name);
         setAddress(result.details.billing_address);

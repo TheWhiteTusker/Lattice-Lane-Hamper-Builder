@@ -3,6 +3,7 @@
 import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { getCloudflareContext } from "@opennextjs/cloudflare";
 import { createClient, requireUser } from "@/lib/supabase/server";
 import { type ActionState, optionalText, describeError } from "@/lib/forms";
 
@@ -39,11 +40,7 @@ export async function saveClient(
     : await supabase.from("clients").insert(values);
 
   if (error) {
-    return {
-      error: /duplicate key/i.test(error.message)
-        ? "A client with that GSTIN already exists."
-        : describeError(error),
-    };
+    return { error: describeError(error) };
   }
 
   revalidatePath("/clients");
@@ -76,7 +73,14 @@ export async function lookupGstin(
   const value = gstin.trim().toUpperCase();
   if (!GSTIN.test(value)) return { error: "Enter a valid 15-character GSTIN first." };
 
-  const key = process.env.GSTIN_API_KEY;
+  let key = process.env.GSTIN_API_KEY;
+  try {
+    const { env } = await getCloudflareContext({ async: true });
+    key ??= (env as unknown as { GSTIN_API_KEY?: string }).GSTIN_API_KEY;
+  } catch {
+    // Not on Cloudflare
+  }
+
   if (!key) return { error: "GST lookup is not configured. Enter the name and address by hand." };
 
   let response: Response;
@@ -94,15 +98,19 @@ export async function lookupGstin(
   // Parsed leniently on purpose: the API adds fields without notice.
   const body = (await response.json().catch(() => null)) as {
     success?: boolean;
-    error?: string;
+    error?: string | Record<string, unknown>;
     data?: Record<string, string | null>;
   } | null;
 
   if (!response.ok || !body?.success || !body.data) {
-    // The API returns a human-readable reason on every failure — better than
-    // anything guessed from the status code, e.g. an unverified-email 402 that
-    // says which button to press rather than "out of credits".
-    return { error: body?.error ?? "GST lookup failed. Enter the details by hand." };
+    let errMsg = "GST lookup failed. Enter the details by hand.";
+    if (typeof body?.error === "string") {
+      errMsg = body.error;
+    } else if (body?.error && typeof body.error === "object") {
+      const errObj = body.error as Record<string, unknown>;
+      errMsg = String(errObj.message || errObj.error || errMsg);
+    }
+    return { error: errMsg };
   }
 
   const { trade_name, legal_name, address, pincode } = body.data;

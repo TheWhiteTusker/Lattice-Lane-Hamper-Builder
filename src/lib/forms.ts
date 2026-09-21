@@ -36,12 +36,54 @@ export const checkbox = z
   .union([z.literal("on"), z.literal("true"), z.string(), z.undefined()])
   .transform((v) => v === "on" || v === "true");
 
-/** Turns a thrown Postgres error into something worth reading. */
+/** Turns an error (Postgres, Supabase PostgrestError, Error instance, etc.) into something worth reading. */
 export function describeError(error: unknown): string {
-  const message = error instanceof Error ? error.message : String(error);
+  if (!error) return "An unexpected error occurred.";
+
+  let message = "";
+  if (typeof error === "string") {
+    message = error;
+  } else if (error instanceof Error) {
+    message = error.message;
+  } else if (typeof error === "object" && error !== null) {
+    const errObj = error as Record<string, unknown>;
+    if (typeof errObj.message === "string" && errObj.message.trim()) {
+      message = errObj.message;
+    } else if (typeof errObj.error_description === "string" && errObj.error_description.trim()) {
+      message = errObj.error_description;
+    } else if (typeof errObj.error === "string" && errObj.error.trim()) {
+      message = errObj.error;
+    } else if (errObj.error && typeof errObj.error === "object") {
+      const nested = errObj.error as Record<string, unknown>;
+      if (typeof nested.message === "string") {
+        message = nested.message;
+      }
+    } else if (typeof errObj.details === "string" && errObj.details.trim()) {
+      message = errObj.details;
+    } else {
+      try {
+        message = JSON.stringify(error);
+      } catch {
+        message = String(error);
+      }
+    }
+  } else {
+    message = String(error);
+  }
+
+  if (message === "[object Object]" || !message.trim()) {
+    try {
+      message = JSON.stringify(error);
+    } catch {
+      message = "An unexpected error occurred.";
+    }
+  }
 
   if (/row-level security|permission denied/i.test(message)) {
     return "You do not have permission to do that.";
+  }
+  if (/duplicate key.*gstin/i.test(message)) {
+    return "A client with that GSTIN already exists.";
   }
   if (/duplicate key.*code/i.test(message)) {
     return "That code is already in use.";
