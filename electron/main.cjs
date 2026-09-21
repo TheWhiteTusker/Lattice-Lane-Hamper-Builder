@@ -76,7 +76,22 @@ async function startServer() {
 // Releases are published to the website (pnpm publish:desktop). On launch the
 // app offers any newer version and installs it silently, so nobody reinstalls
 // by hand.
-const UPDATES = "https://lattice-lane-hamper-builder.digital-9f6.workers.dev/updates/";
+const UPDATE_SERVERS = [
+  "https://lattice-lane-hamper-builder.latticelane.workers.dev/updates/",
+  "https://lattice-lane-hamper-builder.digital-9f6.workers.dev/updates/",
+];
+
+async function fetchFromUpdates(relPath) {
+  for (const base of UPDATE_SERVERS) {
+    try {
+      const res = await fetch(base + relPath, { cache: "no-store" });
+      if (res.ok) return { res, base };
+    } catch {
+      // try next server
+    }
+  }
+  return null;
+}
 
 const isNewer = (a, b) => {
   const [x, y] = [a, b].map((v) => v.split(".").map(Number));
@@ -87,18 +102,18 @@ const isNewer = (a, b) => {
 async function checkForUpdate(manual = false) {
   if (!app.isPackaged && !manual) return { status: "dev" };
   try {
-    const res = await fetch(UPDATES + "latest.json", { cache: "no-store" });
-    if (!res.ok) {
+    const updateResult = await fetchFromUpdates("latest.json");
+    if (!updateResult) {
       if (manual) {
         await dialog.showMessageBox(mainWindow, {
           type: "error",
           title: "Update Check Failed",
-          message: `Could not check for updates (${res.status}).`,
+          message: "Could not reach update server. Please check your internet connection.",
         });
       }
-      return { status: "error", message: `HTTP ${res.status}` };
+      return { status: "error", message: "Could not reach update server" };
     }
-    const { version } = await res.json();
+    const { version } = await updateResult.res.json();
     if (!isNewer(version, app.getVersion())) {
       if (manual) {
         await dialog.showMessageBox(mainWindow, {
@@ -120,7 +135,7 @@ async function checkForUpdate(manual = false) {
     if (response !== 0) return { status: "deferred", version };
 
     mainWindow?.setProgressBar(2); // indeterminate, on the taskbar icon
-    const exe = await fetch(UPDATES + "Lattice-Lane-Setup.exe");
+    const exe = await fetch(updateResult.base + "Lattice-Lane-Setup.exe");
     if (!exe.ok) throw new Error(`Download failed (${exe.status})`);
     const file = path.join(app.getPath("temp"), "Lattice-Lane-Setup.exe");
     fs.writeFileSync(file, Buffer.from(await exe.arrayBuffer()));
