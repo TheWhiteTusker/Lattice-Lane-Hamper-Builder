@@ -8,7 +8,7 @@ import type { ProductCostLine } from "./types.ts";
 
 test("full workflow: user adds birch material, cylinder magnet hardware, PU polish, and laser cutting", () => {
   const lines: ProductCostLine[] = [
-    // 1. Material: 8mm Birch, 10" x 8" (0.56 sq ft), Rate ₹85/sq ft, Qty 2, 10% wastage
+    // 1. Material: 8mm Birch, 10" x 8" (0.5556 sq ft), Rate ₹85/sq ft, Qty 2, 10% wastage
     {
       stage_code: "material",
       category_name: "Woodbased",
@@ -77,14 +77,15 @@ test("full workflow: user adds birch material, cylinder magnet hardware, PU poli
 
   // Verify line calculations
   const line1 = calculateLineCost(lines[0]);
-  // 10 * 8 / 144 = 0.56 sq ft * 85 * 2 = 95.2 * 1.10 = 104.72
+  // 10 * 8 / 144 = 0.5556 sq ft (shown as 0.56) * 85 * 2 * 1.10 = 103.89
+  // The exact area is costed, not the rounded one.
   assert.equal(line1.calculated_area, 0.56);
-  assert.equal(line1.line_total, 104.72);
+  assert.equal(line1.line_total, 103.89);
 
   const line2 = calculateLineCost(lines[1]);
-  // 10 * 8 / 144 = 0.56 sq ft * 55 * 1 = 30.8 * 1.10 = 33.88
+  // 10 * 8 / 144 = 0.5556 sq ft * 55 * 1 * 1.10 = 33.61
   assert.equal(line2.calculated_area, 0.56);
-  assert.equal(line2.line_total, 33.88);
+  assert.equal(line2.line_total, 33.61);
 
   const line3 = calculateLineCost(lines[2]);
   // 2 * 10 = 20
@@ -103,8 +104,8 @@ test("full workflow: user adds birch material, cylinder magnet hardware, PU poli
   // Grand totals with 55% markup
   const totals = calculateCostSheetTotals(lines, 55);
 
-  // Material: 104.72 + 33.88 = 138.6
-  assert.equal(totals.material_total, 138.6);
+  // Material: 103.89 + 33.61 = 137.5
+  assert.equal(totals.material_total, 137.5);
   // Hardware: 20
   assert.equal(totals.hardware_total, 20);
   // Finishing: 55.13
@@ -112,11 +113,11 @@ test("full workflow: user adds birch material, cylinder magnet hardware, PU poli
   // Machine: 151.2
   assert.equal(totals.machine_total, 151.2);
 
-  // Total Cost Price: 138.6 + 20 + 55.13 + 151.2 = 364.93
-  assert.equal(totals.total_cost, 364.93);
+  // Total Cost Price: 137.5 + 20 + 55.13 + 151.2 = 363.83
+  assert.equal(totals.total_cost, 363.83);
 
-  // Selling Price with 55% markup: 364.93 / (1 - 0.55) = 810.96
-  assert.equal(totals.calculated_sp, 810.96);
+  // Selling Price with 55% markup: 363.83 / (1 - 0.55) = 808.51
+  assert.equal(totals.calculated_sp, 808.51);
 
   // Target Margin equals the markup under this formula: 55%
   assert.equal(totals.target_margin, 0.55);

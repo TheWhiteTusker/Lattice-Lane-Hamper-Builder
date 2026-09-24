@@ -269,3 +269,23 @@ test("a stage's overhead % is added to that stage's subtotal only", () => {
   assert.equal(withOverhead(200, 10), 220);
   assert.equal(withOverhead(99.99, ""), 99.99);
 });
+
+test("machine rates follow their unit: per minute, per hour, or by size", () => {
+  const base = { stage_code: "machine", duration_minutes: 30, qty: 1, wastage_pct: 0 };
+  // Per minute (and a line with no unit, as older sheets have): 30 min x 3 = 90
+  assert.equal(calculateLineCost({ ...base, unit: "min", rate: 3 }).line_total, 90);
+  assert.equal(calculateLineCost({ ...base, rate: 3 }).line_total, 90);
+  // Per hour: 30 min = 0.5 h x 600 = 300
+  assert.equal(calculateLineCost({ ...base, unit: "hour", rate: 600 }).line_total, 300);
+  // Engraving per sq inch: 4" x 5" = 20 sq inch x 0.25 = 5; the duration is ignored
+  const engraving = calculateLineCost({ ...base, unit: "sq inch", rate: 0.25, length: 4, breadth: 5, dimension_unit: "inch" });
+  assert.equal(engraving.calculated_area, 20);
+  assert.equal(engraving.line_total, 5);
+});
+
+test("the exact area is costed; the stored area is rounded for display", () => {
+  // 5" x 5" = 0.1736 sq ft: 0.1736 x 1000 = 173.61, not 0.17 x 1000 = 170
+  const line = calculateLineCost({ stage_code: "material", unit: "sq ft", rate: 1000, length: 5, breadth: 5, dimension_unit: "inch", qty: 1, wastage_pct: 0 });
+  assert.equal(line.calculated_area, 0.17);
+  assert.equal(line.line_total, 173.61);
+});

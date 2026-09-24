@@ -30,7 +30,8 @@ export function StageSection({
   // Stages with no categories configured (Miscellaneous) take a free-text
   // description instead of the Category -> Subcategory -> Variety selects.
   const hasCats = stage.categories.length > 0;
-  const colCount = (hasCats ? 3 : 1) + (isMachine ? 1 : 3) + 1 + (isMachine ? 0 : 1) + 4;
+  // Hierarchy, size, (duration), rate / unit, qty, wastage, total, actions.
+  const colCount = (hasCats ? 3 : 1) + 3 + (isMachine ? 1 : 0) + (hasCats ? 1 : 2) + 4;
 
   return (
     <div className="card overflow-hidden shadow-sm">
@@ -56,7 +57,7 @@ export function StageSection({
           collapsed
             ? `(Collapsed — ${stageLines.length} line${stageLines.length === 1 ? "" : "s"}, click + to edit)`
             : isMachine
-              ? "(Billed per minute of machine operation)"
+              ? "(Per minute or hour of machine time, or by size — as set in the master)"
               : hasCats
                 ? "(Category → Subcategory → Variety, dimensions & wastage)"
                 : "(Free-text description, rate & quantity)"
@@ -88,17 +89,18 @@ export function StageSection({
                   ) : (
                     <th className="p-2 min-w-[260px]">Description</th>
                   )}
-                  {isMachine ? (
-                    <th className="p-2 min-w-[110px]">Duration (Mins)</th>
+                  <th className="p-2 min-w-[85px]">Length</th>
+                  <th className="p-2 min-w-[85px]">Breadth</th>
+                  <th className="p-2 min-w-[80px]">Dim Unit</th>
+                  {isMachine && <th className="p-2 min-w-[110px]">Duration (Mins)</th>}
+                  {hasCats ? (
+                    <th className="p-2 min-w-[110px]">Rate / Unit</th>
                   ) : (
                     <>
-                      <th className="p-2 min-w-[85px]">Length</th>
-                      <th className="p-2 min-w-[85px]">Breadth</th>
-                      <th className="p-2 min-w-[80px]">Dim Unit</th>
+                      <th className="p-2 min-w-[85px]">Rate</th>
+                      <th className="p-2 min-w-[90px]">Unit</th>
                     </>
                   )}
-                  <th className="p-2 min-w-[85px]">{isMachine ? "Rate / min" : "Rate / Unit"}</th>
-                  {!isMachine && <th className="p-2 min-w-[90px]">Unit</th>}
                   <th className="p-2 min-w-[65px]">Qty</th>
                   <th className="p-2 min-w-[75px]">Wastage %</th>
                   <th className="p-2 text-right min-w-[95px]">Total Cost</th>

@@ -1,7 +1,7 @@
 "use client";
 
 import { formatMoney } from "@/lib/pricing.ts";
-import type { DimensionUnit } from "@/lib/costing.ts";
+import { isTimeUnit, type DimensionUnit } from "@/lib/costing.ts";
 import type { CostStageWithHierarchy } from "@/lib/types";
 import { NumCell, RemoveButton, UnitCell } from "./cells";
 import type { LineState } from "./lines";
@@ -51,6 +51,9 @@ export function StageLineRow({
   api: CostLines;
 }) {
   const isMachine = stage.code === "machine";
+  // Stages with a hierarchy take their rate and unit from the master.
+  const fromMaster = stage.categories.length > 0;
+  const sized = !isMachine || !isTimeUnit(line.unit || "min");
   const set = (patch: Partial<LineState>) => api.update(line.tempKey, patch);
   const cat = stage.categories.find((c) => c.name === line.category_name);
   const sub = cat?.subcategories.find((s) => s.name === line.subcategory_name);
@@ -94,21 +97,9 @@ export function StageLineRow({
         </td>
       )}
 
-      {isMachine ? (
-        <td className="p-2">
-          <div className="flex items-center gap-1">
-            <input
-              type="number"
-              step="any"
-              value={line.duration_minutes ?? ""}
-              onChange={(e) => set({ duration_minutes: e.target.value ? Number(e.target.value) : null })}
-              placeholder="15"
-              className="input input-num text-xs py-1 px-2"
-            />
-            <span className="text-[11px] text-[var(--color-muted)]">min</span>
-          </div>
-        </td>
-      ) : (
+      {/* Machine rates can be per minute / hour (priced on duration) or by
+          size (e.g. engraving per sq inch); only the fields that count are open. */}
+      {sized ? (
         <>
           <NumCell value={line.length} nullable placeholder="12" onChange={(length) => set({ length })} />
           <NumCell value={line.breadth} nullable placeholder="12" onChange={(breadth) => set({ breadth })} />
@@ -124,10 +115,41 @@ export function StageLineRow({
             </select>
           </td>
         </>
+      ) : (
+        <td colSpan={3} className="p-2 text-center text-[11px] text-[var(--color-muted)]">
+          Priced on time
+        </td>
       )}
+      {isMachine &&
+        (sized ? (
+          <td className="p-2 text-center text-[11px] text-[var(--color-muted)]">—</td>
+        ) : (
+          <td className="p-2">
+            <div className="flex items-center gap-1">
+              <input
+                type="number"
+                step="any"
+                value={line.duration_minutes ?? ""}
+                onChange={(e) => set({ duration_minutes: e.target.value ? Number(e.target.value) : null })}
+                placeholder="15"
+                className="input input-num text-xs py-1 px-2"
+              />
+              <span className="text-[11px] text-[var(--color-muted)]">min</span>
+            </div>
+          </td>
+        ))}
 
-      <NumCell value={line.rate} mono onChange={(rate) => set({ rate: rate ?? 0 })} />
-      {!isMachine && <UnitCell value={line.unit} onChange={(unit) => set({ unit })} />}
+      {fromMaster ? (
+        // The rate comes from the Rates & Hierarchy Master and is not edited here.
+        <td className="p-2 whitespace-nowrap font-mono text-xs font-semibold" title="Set in the Rates & Hierarchy Master">
+          {line.variety_name || line.rate ? `${formatMoney(line.rate)}/${line.unit}` : "—"}
+        </td>
+      ) : (
+        <>
+          <NumCell value={line.rate} mono onChange={(rate) => set({ rate: rate ?? 0 })} />
+          <UnitCell value={line.unit} onChange={(unit) => set({ unit })} />
+        </>
+      )}
       <NumCell value={line.qty} min="0" onChange={(qty) => set({ qty: qty ?? 0 })} />
       <NumCell value={line.wastage_pct} min="0" onChange={(w) => set({ wastage_pct: w ?? 0 })} />
 

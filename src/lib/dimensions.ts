@@ -27,7 +27,7 @@ export type UnitType = (typeof COMMON_UNITS)[number];
 /**
  * Calculates the unit area/quantity based on entered dimensions and the pricing unit.
  */
-export function calculateDimensionArea(
+export function dimensionArea(
   lengthVal: unknown,
   breadthVal: unknown,
   dimensionUnit: DimensionUnit = "inch",
@@ -63,28 +63,28 @@ export function calculateDimensionArea(
       let lInches = l;
       if (dimensionUnit === "mm") lInches = l / 25.4;
       else if (dimensionUnit === "cm") lInches = l / 2.54;
-      return round2(lInches / 12);
+      return lInches / 12;
     }
 
     if (unitLower === "inch" || unitLower === "in") {
       let lInches = l;
       if (dimensionUnit === "mm") lInches = l / 25.4;
       else if (dimensionUnit === "cm") lInches = l / 2.54;
-      return round2(lInches);
+      return lInches;
     }
 
     if (unitLower === "mm") {
       let lMm = l;
       if (dimensionUnit === "inch") lMm = l * 25.4;
       else if (dimensionUnit === "cm") lMm = l * 10;
-      return round2(lMm);
+      return lMm;
     }
 
     if (unitLower === "cm") {
       let lCm = l;
       if (dimensionUnit === "inch") lCm = l * 2.54;
       else if (dimensionUnit === "mm") lCm = l / 10;
-      return round2(lCm);
+      return lCm;
     }
 
     if (unitLower === "meter" || unitLower === "m") {
@@ -92,7 +92,7 @@ export function calculateDimensionArea(
       if (dimensionUnit === "cm") lMeters = l / 100;
       else if (dimensionUnit === "mm") lMeters = l / 1000;
       else if (dimensionUnit === "inch") lMeters = (l * 2.54) / 100;
-      return round2(lMeters);
+      return lMeters;
     }
   }
 
@@ -111,11 +111,11 @@ export function calculateDimensionArea(
   }
 
   if (unitLower === "sq ft" || unitLower === "sqft" || unitLower === "sft") {
-    return round2((lInches * bInches) / 144);
+    return (lInches * bInches) / 144;
   }
 
   if (unitLower === "sq inch" || unitLower === "sq in" || unitLower === "sqin") {
-    return round2(lInches * bInches);
+    return lInches * bInches;
   }
 
   if (unitLower === "sq mm" || unitLower === "sqmm") {
@@ -131,7 +131,7 @@ export function calculateDimensionArea(
         : dimensionUnit === "cm"
           ? b * 10
           : bInches * 25.4;
-    return round2(lMm * bMm);
+    return lMm * bMm;
   }
 
   if (unitLower === "sq cm" || unitLower === "sqcm") {
@@ -147,9 +147,12 @@ export function calculateDimensionArea(
         : dimensionUnit === "mm"
           ? b / 10
           : bInches * 2.54;
-    return round2(lCm * bCm);
+    return lCm * bCm;
   }
 
   // For piece / each / nos or other units, dimensions are descriptive rather than multiplying
   return 1;
 }
+
+/** dimensionArea() rounded to 2 decimals, for display. */
+export const calculateDimensionArea = (...args: Parameters<typeof dimensionArea>) => round2(dimensionArea(...args));

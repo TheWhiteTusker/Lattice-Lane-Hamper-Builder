@@ -1,8 +1,14 @@
 import { num, round2 } from "./numbers.ts";
-import { calculateDimensionArea, type DimensionUnit } from "./dimensions.ts";
+import { dimensionArea, type DimensionUnit } from "./dimensions.ts";
 import type { ProductCostLine } from "./types";
 
 export * from "./dimensions.ts";
+
+/** Time units a rate can be quoted in, as minutes per unit. */
+const MINUTES_PER: Record<string, number> = { min: 1, mins: 1, minute: 1, minutes: 1, hour: 60, hr: 60, hours: 60 };
+
+/** A rate quoted per minute or per hour: priced on duration, not size. */
+export const isTimeUnit = (unit: string | null | undefined) => (unit ?? "").trim().toLowerCase() in MINUTES_PER;
 
 /**
  * Computes the line total cost for a cost item line.
@@ -18,10 +24,12 @@ export function calculateLineCost(line: Partial<ProductCostLine>): {
   // Bought-out items take only the sheet-level markup, never a per-line one.
   const wastage = stage === "bought_out" ? 0 : num(line.wastage_pct);
 
-  // Machine stage is priced per minute
-  if (stage === "machine") {
+  // Machine time: minutes x the rate per minute (or per hour / 60). A machine
+  // rate quoted by size (e.g. engraving per sq inch) is priced on dimensions below.
+  const machineUnit = line.unit || "min";
+  if (stage === "machine" && isTimeUnit(machineUnit)) {
     const duration = num(line.duration_minutes);
-    const baseCost = duration * rate * qty;
+    const baseCost = (duration / MINUTES_PER[machineUnit.trim().toLowerCase()]) * rate * qty;
     const total = baseCost * (1 + wastage / 100);
     return {
       calculated_area: duration,
@@ -63,12 +71,11 @@ export function calculateLineCost(line: Partial<ProductCostLine>): {
   let area = 1;
   let baseCost = 0;
 
-  if (isLinearUnit && l > 0) {
-    area = calculateDimensionArea(l, b, dimUnit, unit);
-    baseCost = area * rate * qty;
-  } else if (isAreaUnit && l > 0 && b > 0) {
-    area = calculateDimensionArea(l, b, dimUnit, unit);
-    baseCost = area * rate * qty;
+  // The exact area is costed; it is rounded only for display.
+  if ((isLinearUnit && l > 0) || (isAreaUnit && l > 0 && b > 0)) {
+    const exact = dimensionArea(l, b, dimUnit, unit);
+    area = round2(exact);
+    baseCost = exact * rate * qty;
   } else {
     // Piece-based or no dimension multiplication
     baseCost = rate * qty;
