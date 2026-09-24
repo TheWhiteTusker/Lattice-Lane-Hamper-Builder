@@ -95,7 +95,11 @@ export function StageLineRow({
           <input
             value={line.item_name}
             onChange={(e) => set({ item_name: e.target.value })}
-            placeholder="e.g. Courier packaging, ribbon, gift tag"
+            placeholder={
+              stage.code === "bought_out"
+                ? "e.g. Water bottle, ceramic jar, chocolates"
+                : "e.g. Courier packaging, ribbon, gift tag"
+            }
             className="input text-xs py-1 px-2"
           />
         </td>
@@ -105,8 +109,18 @@ export function StageLineRow({
           size (e.g. engraving per sq inch); only the fields that count are open. */}
       {sized ? (
         <>
-          <NumCell value={line.length} nullable placeholder="12" onChange={(length) => set({ length })} />
-          <NumCell value={line.breadth} nullable placeholder="12" onChange={(breadth) => set({ breadth })} />
+          <NumCell
+            value={line.length}
+            nullable
+            placeholder={stage.code === "bought_out" ? "—" : "12"}
+            onChange={(length) => set({ length })}
+          />
+          <NumCell
+            value={line.breadth}
+            nullable
+            placeholder={stage.code === "bought_out" ? "—" : "12"}
+            onChange={(breadth) => set({ breadth })}
+          />
           <td className="p-2">
             <select
               value={line.dimension_unit ?? "inch"}
@@ -155,7 +169,13 @@ export function StageLineRow({
         </>
       )}
       <NumCell value={line.qty} min="0" onChange={(qty) => set({ qty: qty ?? 0 })} />
-      <NumCell value={line.wastage_pct} min="0" onChange={(w) => set({ wastage_pct: w ?? 0 })} />
+      {stage.code === "bought_out" ? (
+        <td className="p-2 text-center text-xs text-[var(--color-muted)]" title="Bought-out items have 0% wastage">
+          0%
+        </td>
+      ) : (
+        <NumCell value={line.wastage_pct} min="0" onChange={(w) => set({ wastage_pct: w ?? 0 })} />
+      )}
 
       <td className="p-2 text-right font-mono font-semibold text-[var(--color-ink)]">
         {formatMoney(line.line_total)}

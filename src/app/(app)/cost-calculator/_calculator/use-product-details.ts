@@ -27,10 +27,10 @@ export function useProductDetails({
   const [name, setName] = useState(initialProduct?.name ?? initialSheet?.product_name ?? "");
   const [categoryId, setCategoryId] = useState(initialProduct?.category_id ?? "");
   const [source, setSource] = useState<string>(() => matchOrigin(initialProduct?.source ?? "In-house"));
-  // Stage codes whose line table is hidden. Outsource collapses everything.
+  // Stage codes whose line table is hidden. Outsource collapses manufacturing stages.
   const [collapsedStages, setCollapsedStages] = useState<Set<string>>(() =>
     (initialProduct?.source ?? "").toLowerCase() === "outsource"
-      ? new Set(stages.map((s) => s.code))
+      ? new Set(stages.filter((s) => s.code !== "bought_out").map((s) => s.code))
       : new Set(),
   );
   const [selectedColors, setSelectedColors] = useState<string[]>(initialProduct?.colors ?? ["Walnut"]);
@@ -51,7 +51,11 @@ export function useProductDetails({
   // Product Origin decides whether the stages start collapsed.
   function changeOrigin(origin: string) {
     setSource(origin);
-    setCollapsedStages(origin === "Outsource" ? new Set(stages.map((s) => s.code)) : new Set());
+    setCollapsedStages(
+      origin === "Outsource"
+        ? new Set(stages.filter((s) => s.code !== "bought_out").map((s) => s.code))
+        : new Set(),
+    );
   }
 
   function toggleStage(stageCode: string) {

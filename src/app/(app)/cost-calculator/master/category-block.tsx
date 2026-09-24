@@ -9,14 +9,17 @@ import { SubcategoryBlock } from "./subcategory-block";
 export function CategoryBlock({
   cat,
   isMachine,
+  stageCode,
   ctx,
 }: {
   cat: CostCategoryWithSubcategories;
   isMachine: boolean;
+  stageCode?: string;
   ctx: MasterCtx;
 }) {
   const [adding, setAdding] = useState(false);
   const open = ctx.isOpen(cat.id);
+  const isBoughtOut = stageCode === "bought_out";
 
   function handleAdd(name: string) {
     const fd = new FormData();
@@ -82,7 +85,7 @@ export function CategoryBlock({
         <>
           {adding && (
             <InlineAdd
-              placeholder={`Subcategory under ${cat.name} (e.g. Birch, Rubberwood)`}
+              placeholder={`Subcategory under ${cat.name} (e.g. ${isBoughtOut ? "Glass Bottles, Scented Candles" : "Birch, Rubberwood"})`}
               saveLabel="Save Subcategory"
               busy={ctx.isPending}
               className="bg-white"
@@ -98,7 +101,13 @@ export function CategoryBlock({
           ) : (
             <div className="space-y-3">
               {cat.subcategories.map((sub) => (
-                <SubcategoryBlock key={sub.id} sub={sub} isMachine={isMachine} ctx={ctx} />
+                <SubcategoryBlock
+                  key={sub.id}
+                  sub={sub}
+                  isMachine={isMachine}
+                  stageCode={stageCode}
+                  ctx={ctx}
+                />
               ))}
             </div>
           )}

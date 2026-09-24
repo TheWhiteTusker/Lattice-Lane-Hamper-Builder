@@ -8,7 +8,7 @@ const caption = "text-xs font-semibold text-[var(--color-muted)] uppercase track
 const note = "mt-1 text-[11px] text-[var(--color-muted)]";
 
 /** Cost price, markup %, selling price and margin. */
-export function PricingBoxes({ pricing, source }: { pricing: Pricing; source: string }) {
+export function PricingBoxes({ pricing }: { pricing: Pricing; source?: string }) {
   const { totals } = pricing;
   return (
     <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -18,8 +18,7 @@ export function PricingBoxes({ pricing, source }: { pricing: Pricing; source: st
           {formatMoney(totals.total_cost)}
         </div>
         <p className={note}>
-          Sum of Material + HW + Finishing + Machine + Misc
-          {source !== "In-house" ? " + Bought Out" : ""}
+          Sum of Material + HW + Finishing + Machine + Misc + Bought Out
         </p>
       </div>
 

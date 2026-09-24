@@ -11,6 +11,7 @@ import type {
   ProductImage,
 } from "@/lib/types";
 import { parseProductCode } from "@/lib/product-code";
+import { variantIdsByColor } from "@/lib/product-variants";
 
 function groupBy<T>(rows: T[] | null, key: (row: T) => string) {
   const map = new Map<string, T[]>();
@@ -57,6 +58,7 @@ export async function loadProductCosting(supabase: SupabaseClient, code: string)
   let siblingColors: string[] = product.colors ?? [];
   let allProductIds: string[] = [product.id];
   let siblingIds: string[] = [];
+  let familyProducts: { id: string; code: string; colors?: string[] | null }[] = [product];
 
   if (categoryCode && serial) {
     const { data: siblings } = await supabase
@@ -66,11 +68,14 @@ export async function loadProductCosting(supabase: SupabaseClient, code: string)
       .is("deleted_at", null);
 
     if (siblings && siblings.length > 0) {
+      familyProducts = [product, ...siblings.filter((s) => s.id !== product.id)];
       siblingIds = siblings.map((s) => s.id);
       allProductIds = Array.from(new Set([product.id, ...siblingIds]));
       const collected = new Set<string>(product.colors ?? []);
       for (const s of siblings) {
-        for (const col of s.colors ?? []) collected.add(col);
+        for (const col of s.colors ?? []) {
+          collected.add(col);
+        }
       }
       siblingColors = Array.from(collected);
     }
@@ -119,5 +124,6 @@ export async function loadProductCosting(supabase: SupabaseClient, code: string)
     product: { ...product, colors: siblingColors.length > 0 ? siblingColors : product.colors },
     sheet: sheet ? { ...sheet, lines } : null,
     images: images ?? [],
+    variantIds: variantIdsByColor(familyProducts),
   };
 }

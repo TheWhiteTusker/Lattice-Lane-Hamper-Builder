@@ -41,7 +41,9 @@ export function StageCard({ stage, ctx }: { stage: CostStageWithHierarchy; ctx: 
             </span>
           </div>
           <p className="text-xs text-[var(--color-muted)] mt-0.5">
-            Hierarchy: Category &rarr; Subcategory (e.g. Birch) &rarr; Varieties (e.g. 3mm, 8mm, 12mm)
+            {stage.code === "bought_out"
+              ? "Hierarchy: Category (e.g. Ceramics) → Subcategory (e.g. Jars) → Varieties (e.g. 200ml Amber)"
+              : "Hierarchy: Category → Subcategory (e.g. Birch) → Varieties (e.g. 3mm, 8mm, 12mm)"}
           </p>
         </button>
 
@@ -61,7 +63,7 @@ export function StageCard({ stage, ctx }: { stage: CostStageWithHierarchy; ctx: 
         <>
           {adding && (
             <InlineAdd
-              placeholder={`Category name under ${stage.name} (e.g. Woodbased, Magnets)`}
+              placeholder={`Category name under ${stage.name} (e.g. ${stage.code === "bought_out" ? "Packaging, Ceramics, Goodies" : "Woodbased, Magnets"})`}
               saveLabel="Save Category"
               busy={ctx.isPending}
               className="bg-emerald-50/50"
@@ -71,7 +73,7 @@ export function StageCard({ stage, ctx }: { stage: CostStageWithHierarchy; ctx: 
           )}
           <div className="space-y-4">
             {stage.categories.map((cat) => (
-              <CategoryBlock key={cat.id} cat={cat} isMachine={isMachine} ctx={ctx} />
+              <CategoryBlock key={cat.id} cat={cat} isMachine={isMachine} stageCode={stage.code} ctx={ctx} />
             ))}
           </div>
         </>

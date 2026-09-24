@@ -116,7 +116,7 @@ export type CostStageWithHierarchy = CostStage & {
 export type ProductCostLine = {
   id?: string;
   sheet_id?: string;
-  stage_code: string; // 'material' | 'hardware' | 'finishing' | 'machine'
+  stage_code: string; // 'material' | 'hardware' | 'finishing' | 'machine' | 'miscellaneous' | 'bought_out'
   category_name: string; // e.g. 'Woodbased'
   subcategory_name?: string | null; // e.g. 'Birch'
   variety_name?: string | null; // e.g. '8mm'

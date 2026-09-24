@@ -116,9 +116,9 @@ export function ProductDetailsCard({
           </select>
           <p className="mt-1 text-[11px] text-[var(--color-muted)]">
             {source === "In-house"
-              ? "All 5 cost stages apply."
+              ? "In-house manufacturing stages and bought-out items apply."
               : source === "Outsource"
-                ? "Stages start collapsed — cost the vendor price under Bought Out Items below."
+                ? "Manufacturing stages start collapsed — cost items under Bought Out Items."
                 : "In-house stages plus bought-out items with their own markup."}
           </p>
         </div>

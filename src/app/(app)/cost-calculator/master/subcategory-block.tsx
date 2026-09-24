@@ -8,13 +8,16 @@ import { Chevron, type MasterCtx } from "./master-ui";
 export function SubcategoryBlock({
   sub,
   isMachine,
+  stageCode,
   ctx,
 }: {
   sub: CostSubcategoryWithVarieties;
   isMachine: boolean;
+  stageCode?: string;
   ctx: MasterCtx;
 }) {
   const open = ctx.isOpen(sub.id);
+  const isBoughtOut = stageCode === "bought_out";
 
   function handleDelete() {
     if (!window.confirm(`Are you sure you want to delete subcategory "${sub.name}" and all its varieties?`)) return;
@@ -47,9 +50,9 @@ export function SubcategoryBlock({
             onClick={() => {
               ctx.expand(sub.id);
               ctx.editVariety(sub.id, {
-                unit: isMachine ? "min" : "sq ft",
-                default_rate: isMachine ? 15 : 50,
-                default_wastage_pct: isMachine ? 5 : 10,
+                unit: isMachine ? "min" : isBoughtOut ? "piece" : "sq ft",
+                default_rate: isMachine ? 15 : isBoughtOut ? 100 : 50,
+                default_wastage_pct: isBoughtOut ? 0 : isMachine ? 5 : 10,
               });
             }}
             className="rounded bg-emerald-50 px-2 py-0.5 text-xs font-semibold text-[var(--color-brand-dark)] hover:bg-emerald-100 transition-colors"

@@ -39,6 +39,7 @@ export async function CalculatorScreen({
       initialProduct={costing?.product ?? null}
       initialSheet={costing?.sheet ?? null}
       initialImages={costing?.images ?? []}
+      initialVariantIds={costing?.variantIds ?? {}}
       savedCodes={saved}
     />
   );

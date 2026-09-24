@@ -1,6 +1,5 @@
 "use client";
 
-import { useMemo } from "react";
 import type { ProductColor } from "@/lib/product-code";
 import { ProductImagesManager } from "@/components/product-images-manager";
 import type {
@@ -11,9 +10,7 @@ import type {
   ProductCostSheet,
   ProductImage,
 } from "@/lib/types";
-import { BoughtOutSection } from "./bought-out-section";
 import { CostSummary } from "./cost-summary";
-import { BOUGHT_OUT } from "./lines";
 import { ProductDetailsCard } from "./product-details-card";
 import { StageSection } from "./stage-section";
 import { useCostLines } from "./use-cost-lines";
@@ -30,6 +27,7 @@ export function CostCalculatorView({
   initialProduct,
   initialSheet,
   initialImages = [],
+  initialVariantIds = {},
   savedCodes,
 }: {
   stages: CostStageWithHierarchy[];
@@ -39,20 +37,17 @@ export function CostCalculatorView({
   initialProduct?: Product | null;
   initialSheet?: (ProductCostSheet & { lines?: ProductCostLine[] }) | null;
   initialImages?: ProductImage[];
+  /** Existing colour variant name -> sibling product id, used by photo uploads. */
+  initialVariantIds?: Record<string, string>;
   /** Codes from the save that reset this page, shown as a banner. */
   savedCodes?: string;
 }) {
   const details = useProductDetails({ stages, categories, products, initialProduct, initialSheet });
-  const photos = useProductPhotos(initialImages, details.selectedProductId);
+  const photos = useProductPhotos(initialImages, details.selectedProductId, initialVariantIds);
   const api = useCostLines(stages, initialSheet?.lines);
 
-  // Bought-out lines only count while the origin isn't In-house, so switching
-  // origin does not silently keep charging for them.
-  const { source } = details;
-  const activeLines = useMemo(
-    () => (source !== "In-house" ? api.lines : api.lines.filter((l) => l.stage_code !== BOUGHT_OUT)),
-    [api.lines, source],
-  );
+  // All lines across all stages count towards product costing
+  const activeLines = api.lines;
   const pricing = usePricing(activeLines, initialProduct, initialSheet);
   const { save, isPending, feedback } = useSaveCosting({ details, pricing, photos, activeLines, initialSheet });
   const { selectedProductId, selectedColors } = details;
@@ -110,8 +105,6 @@ export function CostCalculatorView({
           onOverhead={(pct) => pricing.setOverhead(stage.code, pct)}
         />
       ))}
-
-      {source !== "In-house" && <BoughtOutSection api={api} />}
 
       <CostSummary
         details={details}

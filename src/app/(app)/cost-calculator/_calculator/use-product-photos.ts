@@ -31,12 +31,16 @@ export type ProductPhotos = ReturnType<typeof useProductPhotos>;
  * Photos per colour row. Before the product's first save a photo row has no
  * product id, so picked photos wait in the browser and upload after saving.
  */
-export function useProductPhotos(initialImages: ProductImage[], selectedProductId: string) {
+export function useProductPhotos(
+  initialImages: ProductImage[],
+  selectedProductId: string,
+  initialVariantIds: Record<string, string> = {},
+) {
   const [images, setImages] = useState<ProductImage[]>(initialImages);
   // Bumped after a row upload so the gallery remounts with the new photos.
   const [photoVersion, setPhotoVersion] = useState(0);
   // Colour -> product id once a multi-colour save has split the product.
-  const [variantIds, setVariantIds] = useState<Record<string, string>>({});
+  const [variantIds, setVariantIds] = useState<Record<string, string>>(initialVariantIds);
   const [pending, setPending] = useState<Pending[]>([]);
   const [upload, setUpload] = useState<UploadStatus | null>(null);
 

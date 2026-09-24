@@ -31,7 +31,14 @@ export function createEmptyLine(
     length: null,
     breadth: null,
     dimension_unit: "inch",
-    unit: stageCode === "machine" ? "min" : categories.length > 0 ? "sq ft" : "piece",
+    unit:
+      stageCode === "machine"
+        ? "min"
+        : stageCode === "bought_out"
+          ? "piece"
+          : categories.length > 0
+            ? "sq ft"
+            : "piece",
     rate: 0,
     qty: 1,
     duration_minutes: stageCode === "machine" ? 15 : null,

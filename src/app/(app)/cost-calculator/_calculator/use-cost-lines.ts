@@ -68,7 +68,7 @@ export function useCostLines(stages: CostStageWithHierarchy[], initialLines?: Pr
             cost_variety_id: v.id,
             unit: v.unit,
             rate: v.default_rate,
-            wastage_pct: v.default_wastage_pct,
+            wastage_pct: line.stage_code === BOUGHT_OUT ? 0 : v.default_wastage_pct,
           }
         : { variety_name: varName, item_name, cost_variety_id: null },
     );
@@ -94,8 +94,7 @@ export function useCostLines(stages: CostStageWithHierarchy[], initialLines?: Pr
 
   // Bought-out items: a finished item purchased in, priced rate x qty; only
   // the sheet-level markup applies.
-  const addBoughtOut = () =>
-    setLines((prev) => [...prev, { ...createEmptyLine(BOUGHT_OUT, []), category_name: "Bought Out" }]);
+  const addBoughtOut = () => addToStage(BOUGHT_OUT);
 
   return { lines, update, setCategory, setSubcategory, setVariety, duplicate, remove, addToStage, addBoughtOut };
 }

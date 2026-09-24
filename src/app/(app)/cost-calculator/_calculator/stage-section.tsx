@@ -27,6 +27,7 @@ export function StageSection({
   const linesTotal = stageLines.reduce((acc, l) => acc + l.line_total, 0);
   const stageTotal = withOverhead(linesTotal, overhead);
   const isMachine = stage.code === "machine";
+  const isBoughtOut = stage.code === "bought_out";
   // Stages with no categories configured (Miscellaneous) take a free-text
   // description instead of the Category -> Subcategory -> Variety selects.
   const hasCats = stage.categories.length > 0;
@@ -58,9 +59,13 @@ export function StageSection({
             ? `(Collapsed — ${stageLines.length} line${stageLines.length === 1 ? "" : "s"}, click + to edit)`
             : isMachine
               ? "(Per minute or hour of machine time, or by size — as set in the master)"
-              : hasCats
-                ? "(Category → Subcategory → Variety, dimensions & wastage)"
-                : "(Free-text description, rate & quantity)"
+              : isBoughtOut
+                ? hasCats
+                  ? "(Category → Subcategory → Variety — Cost Price = Rate × Qty)"
+                  : "(Free-text description, rate & quantity — Cost Price = Rate × Qty)"
+                : hasCats
+                  ? "(Category → Subcategory → Variety, dimensions & wastage)"
+                  : "(Free-text description, rate & quantity)"
         }
         extra={
           <OverheadInput

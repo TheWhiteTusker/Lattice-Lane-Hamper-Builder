@@ -18,9 +18,6 @@ export function usePricing(
   const [markupPct, setMarkupPct] = useState(
     String(initialProduct?.markup_pct ?? initialSheet?.markup_pct ?? "50"),
   );
-  const [manualSp, setManualSp] = useState(
-    String(initialProduct?.default_sp ?? initialSheet?.calculated_sp ?? ""),
-  );
 
   // Stage code -> overhead % as typed.
   const [overheads, setOverheads] = useState<Record<string, string>>(() =>
@@ -34,6 +31,17 @@ export function usePricing(
     () => calculateCostSheetTotals(activeLines, num(markupPct), overheads),
     [activeLines, markupPct, overheads],
   );
+
+  const [manualSp, setManualSp] = useState(() => {
+    // Saved lines are refreshed from the current rate master before they reach
+    // this hook. Start with a price calculated from those same current rates,
+    // just as changing the markup does, instead of briefly showing a stale
+    // catalogue price. Keep the saved price for products without costing lines.
+    if (totals.total_cost > 0) return String(totals.calculated_sp);
+    const savedSp = roundUpToNext10(initialProduct?.default_sp ?? initialSheet?.calculated_sp ?? 0);
+    return savedSp > 0 ? String(savedSp) : "";
+  });
+
   const effectiveSp = manualSp ? roundUpToNext10(num(manualSp)) : totals.calculated_sp;
   const effectiveMargin = effectiveSp > 0 ? (effectiveSp - totals.total_cost) / effectiveSp : 0;
 
