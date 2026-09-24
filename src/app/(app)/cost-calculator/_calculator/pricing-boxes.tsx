@@ -61,6 +61,7 @@ export function PricingBoxes({ pricing, source }: { pricing: Pricing; source: st
             step="any"
             value={pricing.manualSp}
             onChange={(e) => pricing.changeSp(e.target.value)}
+            onBlur={() => pricing.roundManualSp()}
             placeholder={String(totals.calculated_sp)}
             className="input input-num text-lg font-black font-mono py-1 text-[var(--color-brand-dark)]"
           />

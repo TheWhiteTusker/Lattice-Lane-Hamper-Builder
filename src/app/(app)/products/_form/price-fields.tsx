@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { round2 } from "@/lib/pricing";
+import { round2, roundUpToNext10 } from "@/lib/pricing";
 import type { Product } from "@/lib/types";
 
 /** Cost price, markup % and selling price; markup and SP keep each other in step. */
@@ -20,7 +20,7 @@ export function PriceFields({ product }: { product?: Product }) {
     const cp = Number(costPrice);
     const m = Number(markup);
     if (!Number.isFinite(cp) || !Number.isFinite(m)) return;
-    setSellingPrice(String(round2(cp * (1 + m / 100))));
+    setSellingPrice(String(roundUpToNext10(cp * (1 + m / 100))));
   }
 
   function handleSpChange(val: string) {
@@ -29,6 +29,20 @@ export function PriceFields({ product }: { product?: Product }) {
     const cp = Number(costPrice);
     if (Number.isFinite(sp) && Number.isFinite(cp) && cp > 0 && sp > 0) {
       setMarkup(String(round2(((sp - cp) / cp) * 100)));
+    }
+  }
+
+  function handleSpBlur() {
+    if (sellingPrice) {
+      const sp = Number(sellingPrice);
+      if (Number.isFinite(sp) && sp > 0) {
+        const rounded = roundUpToNext10(sp);
+        setSellingPrice(String(rounded));
+        const cp = Number(costPrice);
+        if (Number.isFinite(cp) && cp > 0) {
+          setMarkup(String(round2(((rounded - cp) / cp) * 100)));
+        }
+      }
     }
   }
 
@@ -77,6 +91,7 @@ export function PriceFields({ product }: { product?: Product }) {
           inputMode="decimal"
           value={sellingPrice}
           onChange={(e) => handleSpChange(e.target.value)}
+          onBlur={handleSpBlur}
           className="input input-num mt-1 font-mono font-bold text-[var(--color-ink)]"
         />
       </div>

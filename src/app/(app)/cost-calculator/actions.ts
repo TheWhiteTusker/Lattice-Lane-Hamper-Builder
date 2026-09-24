@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { calculateCostSheetTotals } from "@/lib/costing.ts";
+import { roundUpToNext10 } from "@/lib/numbers.ts";
 import { describeError } from "@/lib/forms";
 import { getNextSerialForCategory } from "@/lib/product-code";
 import type { ProductCostLine } from "@/lib/types";
@@ -50,10 +51,11 @@ export async function saveCostSheetAndProduct(payload: SaveCostSheetPayload) {
         .filter(([, pct]) => Number.isFinite(pct) && pct !== 0),
     );
     const totals = calculateCostSheetTotals(preparedLines, payload.markupPct, stageOverheads);
-    const finalSellingPrice =
+    const rawSellingPrice =
       payload.sellingPrice != null && payload.sellingPrice > 0
         ? payload.sellingPrice
         : totals.calculated_sp;
+    const finalSellingPrice = roundUpToNext10(rawSellingPrice);
 
     const targetMargin =
       finalSellingPrice > 0 ? (finalSellingPrice - totals.total_cost) / finalSellingPrice : 0;

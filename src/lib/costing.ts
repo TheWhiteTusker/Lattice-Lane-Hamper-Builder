@@ -1,4 +1,4 @@
-import { num, round2 } from "./numbers.ts";
+import { num, round2, roundUpToNext10 } from "./numbers.ts";
 import { dimensionArea, type DimensionUnit } from "./dimensions.ts";
 import type { ProductCostLine } from "./types";
 
@@ -109,7 +109,7 @@ export type CostSheetTotals = {
 export function scaledPrice(oldCost: unknown, oldSp: unknown, newCost: number, fallbackSp: number) {
   const cost = num(oldCost);
   const sp = num(oldSp);
-  return cost > 0 && sp > 0 ? round2((sp * newCost) / cost) : fallbackSp;
+  return cost > 0 && sp > 0 ? roundUpToNext10((sp * newCost) / cost) : roundUpToNext10(fallbackSp);
 }
 
 /** Overhead % per stage code, e.g. { material: 10 }; added on top of that stage's lines. */
@@ -165,8 +165,9 @@ export function calculateCostSheetTotals(
   const mPct = num(markupPct);
   // SP = CP / (1 - markup% / 100). A markup of 100% or more has no finite
   // selling price, so it falls back to cost price rather than Infinity/NaN.
+  // Selling prices round off to the next 10 (e.g. 271.50 -> 280).
   const divisor = 1 - mPct / 100;
-  const calculated_sp = divisor > 0 ? round2(total_cost / divisor) : total_cost;
+  const calculated_sp = divisor > 0 ? roundUpToNext10(total_cost / divisor) : roundUpToNext10(total_cost);
   const target_margin = calculated_sp > 0 ? (calculated_sp - total_cost) / calculated_sp : 0;
 
   return {

@@ -116,8 +116,8 @@ test("full workflow: user adds birch material, cylinder magnet hardware, PU poli
   // Total Cost Price: 137.5 + 20 + 55.13 + 151.2 = 363.83
   assert.equal(totals.total_cost, 363.83);
 
-  // Selling Price with 55% markup: 363.83 / (1 - 0.55) = 808.51
-  assert.equal(totals.calculated_sp, 808.51);
+  // Selling Price with 55% markup: 363.83 / (1 - 0.55) = 808.51 -> rounded up to next 10 is 810
+  assert.equal(totals.calculated_sp, 810);
 
   // Target Margin equals the markup under this formula: 55%
   assert.equal(totals.target_margin, 0.55);

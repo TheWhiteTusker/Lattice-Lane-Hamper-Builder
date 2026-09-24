@@ -61,10 +61,10 @@ export function useSaveCosting({
         ? res.variants.map((v) => v.code).join(", ")
         : (res.productCode ?? code);
 
-      // All good: start a fresh, blank calculator. The t param changes the
-      // page key so it remounts even when already on /cost-calculator.
+      // All good: redirect to the expanded product page of that specific product
       if (!photo.failed) {
-        router.push(`/cost-calculator?saved=${encodeURIComponent(savedCodes)}&t=${Date.now()}`);
+        const targetCode = res.productCode ?? code;
+        router.push(`/products/${encodeURIComponent(targetCode)}`);
         return;
       }
 

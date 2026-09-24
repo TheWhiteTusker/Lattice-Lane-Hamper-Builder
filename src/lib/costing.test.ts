@@ -194,7 +194,7 @@ test("calculateCostSheetTotals aggregates all stages and applies markup", () => 
   // Finishing: 35
   // Machine: 189
   // Total Cost = 451
-  // Markup 50% -> SP = 451 / (1 - 0.5) = 902
+  // Markup 50% -> SP = 451 / (1 - 0.5) = 902 -> rounded up to next 10 is 910
   const totals = calculateCostSheetTotals(lines, 50);
 
   assert.equal(totals.material_total, 187);
@@ -203,7 +203,7 @@ test("calculateCostSheetTotals aggregates all stages and applies markup", () => 
   assert.equal(totals.machine_total, 189);
   assert.equal(totals.total_cost, 451);
   assert.equal(totals.markup_pct, 50);
-  assert.equal(totals.calculated_sp, 902);
+  assert.equal(totals.calculated_sp, 910);
   assert.equal(totals.target_margin, 0.5); // 50% margin
 });
 
@@ -293,9 +293,11 @@ test("the exact area is costed; the stored area is rounded for display", () => {
 
 test("a repriced product keeps its margin, including a hand-set price", () => {
   // Priced by the markup formula: 55.5 cost -> 277.5 (80% margin); cost +10% -> price +10%
-  assert.equal(scaledPrice(55.5, 277.5, 61.05, 999), 305.25);
+  // 305.25 rounds up to next 10 -> 310
+  assert.equal(scaledPrice(55.5, 277.5, 61.05, 999), 310);
   // Hand-set price above the markup price stays proportionally above it
-  assert.equal(scaledPrice(321.78, 2883.3, 353.96, 999), 3171.65);
+  // 3171.65 rounds up to next 10 -> 3180
+  assert.equal(scaledPrice(321.78, 2883.3, 353.96, 999), 3180);
   // Nothing to scale from: use the markup price given
   assert.equal(scaledPrice(0, 0, 100, 500), 500);
 });

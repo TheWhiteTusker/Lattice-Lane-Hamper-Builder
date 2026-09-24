@@ -23,3 +23,13 @@ export const normalizePct = (v: unknown): number => {
   const n = num(v);
   return n > 1 ? n / 100 : n;
 };
+
+/**
+ * Rounds a selling price up to the next multiple of 10.
+ * Examples: 271.50 -> 280, 270 -> 270, 270.01 -> 280, 280 -> 280.
+ */
+export const roundUpToNext10 = (v: unknown): number => {
+  const n = num(v);
+  if (!Number.isFinite(n) || n <= 0) return 0;
+  return Math.ceil(n / 10) * 10;
+};

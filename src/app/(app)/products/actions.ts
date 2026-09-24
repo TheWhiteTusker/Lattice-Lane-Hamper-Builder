@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { codesForColors } from "@/lib/product-code";
+import { roundUpToNext10 } from "@/lib/numbers.ts";
 import {
   type ActionState,
   optionalText,
@@ -43,11 +44,14 @@ export async function saveProduct(
   }
 
   const { id, ...fields } = parsed.data;
+  // Selling prices round off to the next 10 (e.g. 271.50 -> 280)
+  const default_sp = roundUpToNext10(fields.default_sp);
   // Margin is no longer entered on the form; it is still stored because hamper
   // costing snapshots it, so keep it in step with the price actually set.
   const values = {
     ...fields,
-    target_margin: fields.default_sp > 0 ? Math.round(((fields.default_sp - fields.cost_price) / fields.default_sp) * 10000) / 10000 : 0,
+    default_sp,
+    target_margin: default_sp > 0 ? Math.round(((default_sp - fields.cost_price) / default_sp) * 10000) / 10000 : 0,
   };
   const supabase = await createClient();
 
@@ -69,7 +73,8 @@ export async function saveProduct(
   if (error) return { error: describeError(error) };
 
   revalidatePath("/products");
-  redirect(`/products?saved=${encodeURIComponent(rows.map((r) => r.code).join(", "))}`);
+  revalidatePath(`/products/${encodeURIComponent(values.code)}`);
+  redirect(`/products/${encodeURIComponent(values.code)}`);
 }
 
 export async function deleteProduct(

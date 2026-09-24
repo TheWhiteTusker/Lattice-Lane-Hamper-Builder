@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { calculateCostSheetTotals } from "@/lib/costing.ts";
-import { num, round2 } from "@/lib/pricing.ts";
+import { num, round2, roundUpToNext10 } from "@/lib/pricing.ts";
 import type { Product, ProductCostSheet } from "@/lib/types";
 import type { LineState } from "./lines";
 
@@ -34,7 +34,7 @@ export function usePricing(
     () => calculateCostSheetTotals(activeLines, num(markupPct), overheads),
     [activeLines, markupPct, overheads],
   );
-  const effectiveSp = manualSp ? num(manualSp) : totals.calculated_sp;
+  const effectiveSp = manualSp ? roundUpToNext10(num(manualSp)) : totals.calculated_sp;
   const effectiveMargin = effectiveSp > 0 ? (effectiveSp - totals.total_cost) / effectiveSp : 0;
 
   function changeMarkup(val: string) {
@@ -42,7 +42,7 @@ export function usePricing(
     const divisor = 1 - num(val) / 100;
     // 100%+ has no finite SP; leave the price alone rather than show Infinity
     if (divisor <= 0) return;
-    setManualSp(String(round2(totals.total_cost / divisor)));
+    setManualSp(String(roundUpToNext10(totals.total_cost / divisor)));
   }
 
   function changeSp(val: string) {
@@ -53,13 +53,25 @@ export function usePricing(
     }
   }
 
+  function roundManualSp() {
+    if (manualSp) {
+      const rounded = roundUpToNext10(num(manualSp));
+      if (rounded > 0 && String(rounded) !== manualSp) {
+        setManualSp(String(rounded));
+        if (totals.total_cost > 0) {
+          setMarkupPct(String(round2(((rounded - totals.total_cost) / rounded) * 100)));
+        }
+      }
+    }
+  }
+
   /** The overheads to save: numbers, blanks and zeros left out. */
   const stageOverheads = Object.fromEntries(
     Object.entries(overheads).flatMap(([k, v]) => (num(v) ? [[k, num(v)]] : [])),
   );
 
   return {
-    markupPct, manualSp, totals, effectiveSp, effectiveMargin, changeMarkup, changeSp,
+    markupPct, manualSp, totals, effectiveSp, effectiveMargin, changeMarkup, changeSp, roundManualSp,
     overheadFor, setOverhead, stageOverheads,
   };
 }
