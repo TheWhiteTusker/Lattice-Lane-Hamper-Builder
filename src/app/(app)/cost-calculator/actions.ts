@@ -18,6 +18,8 @@ export type SaveCostSheetPayload = {
   colors?: string[];
   isActive?: boolean;
   markupPct: number;
+  /** Overhead % per stage code, added to that stage's subtotal. */
+  stageOverheads?: Record<string, number>;
   sellingPrice?: number;
   notes?: string | null;
   lines: ProductCostLine[];
@@ -41,7 +43,13 @@ export async function saveCostSheetAndProduct(payload: SaveCostSheetPayload) {
     if (!name) return { error: "Product name is required." };
 
     const preparedLines = prepareLines(payload.lines);
-    const totals = calculateCostSheetTotals(preparedLines, payload.markupPct);
+    // Only real, non-zero percentages are kept.
+    const stageOverheads = Object.fromEntries(
+      Object.entries(payload.stageOverheads ?? {})
+        .map(([stage, pct]) => [stage.toLowerCase(), Number(pct)] as const)
+        .filter(([, pct]) => Number.isFinite(pct) && pct !== 0),
+    );
+    const totals = calculateCostSheetTotals(preparedLines, payload.markupPct, stageOverheads);
     const finalSellingPrice =
       payload.sellingPrice != null && payload.sellingPrice > 0
         ? payload.sellingPrice
@@ -85,6 +93,7 @@ export async function saveCostSheetAndProduct(payload: SaveCostSheetPayload) {
         total_cost: totals.total_cost,
         markup_pct: totals.markup_pct,
         calculated_sp: finalSellingPrice,
+        stage_overheads: stageOverheads,
         notes: payload.notes || null,
         created_by: user.id,
       },

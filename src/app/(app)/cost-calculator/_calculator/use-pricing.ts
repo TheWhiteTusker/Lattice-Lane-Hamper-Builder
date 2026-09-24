@@ -6,7 +6,10 @@ import type { LineState } from "./lines";
 
 export type Pricing = ReturnType<typeof usePricing>;
 
-/** Live totals, with markup % and selling price each updating the other. */
+/**
+ * Live totals, with markup % and selling price each updating the other.
+ * Each stage's overhead % is added to that stage's subtotal.
+ */
 export function usePricing(
   activeLines: LineState[],
   initialProduct?: Product | null,
@@ -19,9 +22,17 @@ export function usePricing(
     String(initialProduct?.default_sp ?? initialSheet?.calculated_sp ?? ""),
   );
 
+  // Stage code -> overhead % as typed.
+  const [overheads, setOverheads] = useState<Record<string, string>>(() =>
+    Object.fromEntries(Object.entries(initialSheet?.stage_overheads ?? {}).map(([k, v]) => [k, String(v)])),
+  );
+  const overheadFor = (stageCode: string) => overheads[stageCode.toLowerCase()] ?? "";
+  const setOverhead = (stageCode: string, pct: string) =>
+    setOverheads((prev) => ({ ...prev, [stageCode.toLowerCase()]: pct }));
+
   const totals = useMemo(
-    () => calculateCostSheetTotals(activeLines, num(markupPct)),
-    [activeLines, markupPct],
+    () => calculateCostSheetTotals(activeLines, num(markupPct), overheads),
+    [activeLines, markupPct, overheads],
   );
   const effectiveSp = manualSp ? num(manualSp) : totals.calculated_sp;
   const effectiveMargin = effectiveSp > 0 ? (effectiveSp - totals.total_cost) / effectiveSp : 0;
@@ -42,5 +53,13 @@ export function usePricing(
     }
   }
 
-  return { markupPct, manualSp, totals, effectiveSp, effectiveMargin, changeMarkup, changeSp };
+  /** The overheads to save: numbers, blanks and zeros left out. */
+  const stageOverheads = Object.fromEntries(
+    Object.entries(overheads).flatMap(([k, v]) => (num(v) ? [[k, num(v)]] : [])),
+  );
+
+  return {
+    markupPct, manualSp, totals, effectiveSp, effectiveMargin, changeMarkup, changeSp,
+    overheadFor, setOverhead, stageOverheads,
+  };
 }

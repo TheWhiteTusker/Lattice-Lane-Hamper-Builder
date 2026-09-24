@@ -3,6 +3,7 @@ import { formatMoney } from "@/lib/pricing";
 import { ImagePreview } from "@/components/image-preview";
 import type { ProductWithCategory } from "@/lib/types";
 import { costingHref } from "../../cost-calculator/href";
+import { DeleteProductButton } from "./delete-product-button";
 
 /** One product in the Product Master table. */
 export function ProductRow({ p, admin }: { p: ProductWithCategory; admin: boolean }) {
@@ -57,12 +58,15 @@ export function ProductRow({ p, admin }: { p: ProductWithCategory; admin: boolea
             Costing
           </Link>
           {admin && (
-            <Link
-              href={`/products/${encodeURIComponent(p.code)}?edit=1`}
-              className="font-medium text-[var(--color-ink)] hover:text-[var(--color-brand)] hover:underline"
-            >
-              Edit
-            </Link>
+            <>
+              <Link
+                href={`/products/${encodeURIComponent(p.code)}?edit=1`}
+                className="font-medium text-[var(--color-ink)] hover:text-[var(--color-brand)] hover:underline"
+              >
+                Edit
+              </Link>
+              <DeleteProductButton id={p.id} label={`${p.code} (${p.name})`} />
+            </>
           )}
         </div>
       </td>

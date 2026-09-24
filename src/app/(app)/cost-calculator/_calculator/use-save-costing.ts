@@ -45,6 +45,7 @@ export function useSaveCosting({
         colors: details.selectedColors,
         isActive: details.isActive,
         markupPct: num(pricing.markupPct),
+        stageOverheads: pricing.stageOverheads,
         sellingPrice: pricing.effectiveSp,
         notes: details.notes.trim() || null,
         // Skip starter rows left empty

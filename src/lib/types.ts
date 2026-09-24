@@ -146,6 +146,8 @@ export type ProductCostSheet = {
   total_cost: number;
   markup_pct: number;
   calculated_sp: number;
+  /** Overhead % per stage code, already included in the stage totals. */
+  stage_overheads?: Record<string, number> | null;
   notes: string | null;
   created_by: string | null;
   created_at: string;

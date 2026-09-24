@@ -104,6 +104,8 @@ export function CostCalculatorView({
           api={api}
           collapsed={details.collapsedStages.has(stage.code)}
           onToggle={() => details.toggleStage(stage.code)}
+          overhead={pricing.overheadFor(stage.code)}
+          onOverhead={(pct) => pricing.setOverhead(stage.code, pct)}
         />
       ))}
 

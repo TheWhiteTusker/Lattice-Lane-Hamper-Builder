@@ -1,8 +1,9 @@
 "use client";
 
-import { formatMoney } from "@/lib/pricing.ts";
+import { withOverhead } from "@/lib/costing.ts";
+import { formatMoney, num } from "@/lib/pricing.ts";
 import type { CostStageWithHierarchy } from "@/lib/types";
-import { SectionHeader } from "./cells";
+import { OverheadInput, SectionHeader } from "./cells";
 import { StageLineRow } from "./stage-line-row";
 import type { CostLines } from "./use-cost-lines";
 
@@ -11,13 +12,20 @@ export function StageSection({
   api,
   collapsed,
   onToggle,
+  overhead,
+  onOverhead,
 }: {
   stage: CostStageWithHierarchy;
   api: CostLines;
   collapsed: boolean;
   onToggle: () => void;
+  /** Overhead % as typed, added to this stage's subtotal. */
+  overhead: string;
+  onOverhead: (pct: string) => void;
 }) {
   const stageLines = api.lines.filter((l) => l.stage_code === stage.code);
+  const linesTotal = stageLines.reduce((acc, l) => acc + l.line_total, 0);
+  const stageTotal = withOverhead(linesTotal, overhead);
   const isMachine = stage.code === "machine";
   // Stages with no categories configured (Miscellaneous) take a free-text
   // description instead of the Category -> Subcategory -> Variety selects.
@@ -53,8 +61,16 @@ export function StageSection({
                 ? "(Category → Subcategory → Variety, dimensions & wastage)"
                 : "(Free-text description, rate & quantity)"
         }
+        extra={
+          <OverheadInput
+            stageName={stage.name}
+            value={overhead}
+            added={num(overhead) ? formatMoney(stageTotal - linesTotal) : null}
+            onChange={onOverhead}
+          />
+        }
         totalLabel="Stage Total:"
-        total={formatMoney(stageLines.reduce((acc, l) => acc + l.line_total, 0))}
+        total={formatMoney(stageTotal)}
       />
 
       {!collapsed && (

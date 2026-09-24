@@ -94,12 +94,20 @@ export type CostSheetTotals = {
   target_margin: number;
 };
 
+/** Overhead % per stage code, e.g. { material: 10 }; added on top of that stage's lines. */
+export type StageOverheads = Record<string, unknown>;
+
+/** A stage's subtotal with its overhead % added. */
+export const withOverhead = (amount: number, overheadPct: unknown) => round2(amount * (1 + num(overheadPct) / 100));
+
 /**
- * Aggregates all lines by stage and calculates selling price and margin.
+ * Aggregates all lines by stage, adds each stage's overhead %, and
+ * calculates selling price and margin.
  */
 export function calculateCostSheetTotals(
   lines: Partial<ProductCostLine>[],
   markupPct: unknown = 0,
+  overheads: StageOverheads = {},
 ): CostSheetTotals {
   let material_total = 0;
   let hardware_total = 0;
@@ -108,8 +116,9 @@ export function calculateCostSheetTotals(
   let other_total = 0;
 
   for (const line of lines) {
-    const { line_total } = calculateLineCost(line);
     const stage = (line.stage_code ?? "").toLowerCase();
+    // Scaling each line by its stage's overhead is the same as scaling the stage subtotal.
+    const line_total = calculateLineCost(line).line_total * (1 + num(overheads[stage]) / 100);
 
     if (stage === "material") {
       material_total += line_total;

@@ -4,6 +4,7 @@ import {
   calculateDimensionArea,
   calculateLineCost,
   calculateCostSheetTotals,
+  withOverhead,
 } from "./costing.ts";
 
 test("calculateDimensionArea handles inches to sq ft", () => {
@@ -246,4 +247,25 @@ test("SP = CP / (1 - markup%), and 100%+ markup falls back to cost price", () =>
     assert.ok(Number.isFinite(sp), `markup ${bad}% produced ${sp}`);
     assert.equal(sp, 600);
   }
+});
+
+test("a stage's overhead % is added to that stage's subtotal only", () => {
+  const lines = [
+    { stage_code: "material", unit: "piece", rate: 100, qty: 2, wastage_pct: 0 }, // 200
+    { stage_code: "hardware", unit: "piece", rate: 50, qty: 1, wastage_pct: 0 }, // 50
+    { stage_code: "miscellaneous", unit: "piece", rate: 40, qty: 1, wastage_pct: 0 }, // 40
+  ];
+
+  const totals = calculateCostSheetTotals(lines, 50, { material: 10, miscellaneous: "25" });
+
+  assert.equal(totals.material_total, 220); // 200 + 10%
+  assert.equal(totals.hardware_total, 50); // no overhead set
+  assert.equal(totals.other_total, 50); // 40 + 25%
+  assert.equal(totals.total_cost, 320);
+  assert.equal(totals.calculated_sp, 640); // overhead flows into the selling price
+
+  // Blank or missing overhead changes nothing
+  assert.equal(calculateCostSheetTotals(lines, 50, { material: "" }).total_cost, 290);
+  assert.equal(withOverhead(200, 10), 220);
+  assert.equal(withOverhead(99.99, ""), 99.99);
 });
