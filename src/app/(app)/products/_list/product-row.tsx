@@ -19,7 +19,7 @@ export function ProductRow({ p, admin }: { p: ProductWithCategory; admin: boolea
           />
         ) : (
           <Link
-            href={`/products/${encodeURIComponent(p.code)}?edit=1`}
+            href={costingHref(p.code)}
             title={`Add photos for ${p.name}`}
             className="mx-auto flex h-9 w-9 items-center justify-center rounded-md border border-dashed border-slate-300 bg-slate-50 text-[10px] font-semibold text-slate-400 hover:border-[var(--color-brand)] hover:text-[var(--color-brand)] transition-colors"
           >
@@ -51,22 +51,21 @@ export function ProductRow({ p, admin }: { p: ProductWithCategory; admin: boolea
       <td className="num">{formatMoney(p.default_sp)}</td>
       <td className="num">
         <div className="flex items-center justify-end gap-2.5">
-          <Link
-            href={costingHref(p.code)}
-            className="text-[var(--color-brand)] hover:underline font-medium"
-          >
-            Costing
-          </Link>
-          {admin && (
+          {/* Editing a product happens in the cost calculator. */}
+          {admin ? (
             <>
               <Link
-                href={`/products/${encodeURIComponent(p.code)}?edit=1`}
+                href={costingHref(p.code)}
                 className="font-medium text-[var(--color-ink)] hover:text-[var(--color-brand)] hover:underline"
               >
                 Edit
               </Link>
               <DeleteProductButton id={p.id} label={`${p.code} (${p.name})`} />
             </>
+          ) : (
+            <Link href={costingHref(p.code)} className="text-[var(--color-brand)] hover:underline font-medium">
+              Costing
+            </Link>
           )}
         </div>
       </td>

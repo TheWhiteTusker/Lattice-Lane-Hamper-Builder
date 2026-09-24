@@ -1,15 +1,19 @@
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { requireRole } from "@/lib/supabase/server";
 import { loadSettings } from "@/lib/settings";
 import { resolveColors } from "@/lib/product-code";
-import { formatMoney } from "@/lib/pricing";
+import { calculateCostSheetTotals } from "@/lib/costing.ts";
+import { num } from "@/lib/pricing";
 import { PageHeader } from "@/components/ui";
-import { ImagePreview } from "@/components/image-preview";
-import { ProductForm } from "../product-form";
-import type { Category, Product, ProductImage } from "@/lib/types";
+import type { Category } from "@/lib/types";
 import { costingHref } from "../../cost-calculator/href";
+import { loadCostStages, loadProductCosting } from "../../cost-calculator/load";
+import { CostTable } from "./_view/cost-table";
+import { PriceSummary } from "./_view/price-summary";
+import { ProductCard } from "./_view/product-card";
 
+/** A product's saved costing in the calculator's layout, read-only; Edit opens the calculator. */
 export default async function ProductPage({
   params,
   searchParams,
@@ -18,135 +22,68 @@ export default async function ProductPage({
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const { code } = await params;
-  const editing = (await searchParams).edit === "1";
-  const rawCode = Array.isArray(code) ? code.join("/") : code;
-  const decodedCode = decodeURIComponent(rawCode);
+  const decodedCode = decodeURIComponent(Array.isArray(code) ? code.join("/") : code);
+  // Products are edited in the cost calculator; old ?edit=1 links go there.
+  if ((await searchParams).edit === "1") redirect(costingHref(decodedCode));
+
   const { supabase } = await requireRole("admin");
-
-  const [{ data: product }, { data: categories }, settings] = await Promise.all([
-    supabase
-      .from("products")
-      .select("*")
-      .eq("code", decodedCode)
-      .is("deleted_at", null)
-      .maybeSingle<Product>(),
-    supabase.from("categories").select("*").order("sort_order").order("name").returns<Category[]>(),
+  const [costing, stages, settings, { data: categories }] = await Promise.all([
+    loadProductCosting(supabase, decodedCode),
+    loadCostStages(supabase),
     loadSettings(supabase),
+    supabase.from("categories").select("*").returns<Category[]>(),
   ]);
+  if (!costing) notFound();
 
-  if (!product) notFound();
-
-  const { data: images } = await supabase
-    .from("product_images")
-    .select("*")
-    .eq("product_id", product.id)
-    .is("deleted_at", null)
-    .order("sort_order")
-    .order("created_at")
-    .returns<ProductImage[]>();
-
-  const href = `/products/${encodeURIComponent(product.code)}`;
-
-  if (editing) {
-    return (
-      <>
-        <PageHeader title={`Edit ${product.name}`} subtitle={product.code}>
-          <Link href={href} className="btn-secondary">
-            Cancel
-          </Link>
-        </PageHeader>
-        <ProductForm
-          product={product}
-          initialImages={images ?? []}
-          categories={categories ?? []}
-          sources={settings.sources}
-          allColors={resolveColors(settings.product_colors, settings.color_hex)}
-        />
-      </>
-    );
-  }
-
-  const category = categories?.find((c) => c.id === product.category_id);
-  const colors = resolveColors(product.colors ?? [], settings.color_hex);
-  const photos = images ?? [];
-
-  const fields: [string, string][] = [
-    ["Code", product.code],
-    ["Category", category?.name ?? "—"],
-    ["Source / vendor", product.source ?? "—"],
-    ["Status", product.is_active ? "Active" : "Inactive"],
-    ["Cost price", formatMoney(product.cost_price)],
-    ["Markup", product.markup_pct != null ? `${product.markup_pct}%` : "—"],
-    ["Selling price", formatMoney(product.default_sp)],
-  ];
+  const { product, sheet, images } = costing;
+  const lines = sheet?.lines ?? [];
+  const overheads = sheet?.stage_overheads ?? {};
+  const totals = sheet ? calculateCostSheetTotals(lines, sheet.markup_pct, overheads) : null;
+  // Cost types in the calculator's order, skipping any with no lines; the rest is bought out.
+  const sections = stages.filter((s) => lines.some((l) => l.stage_code === s.code));
+  const known = new Set(stages.map((s) => s.code));
+  const boughtOut = lines.filter((l) => !known.has(l.stage_code));
 
   return (
     <>
       <PageHeader title={product.name} subtitle={product.code}>
-        <Link
-          href={costingHref(product.code)}
-          className="btn-secondary"
-        >
-          Cost Calculator
-        </Link>
-        <Link href={`${href}?edit=1`} className="btn-primary">
+        <Link href={costingHref(product.code)} className="btn-primary">
           Edit
         </Link>
       </PageHeader>
 
-      <div className="card max-w-2xl p-5">
-        <dl className="grid gap-x-6 gap-y-3 sm:grid-cols-2">
-          {fields.map(([label, value]) => (
-            <div key={label}>
-              <dt className="label">{label}</dt>
-              <dd className="mt-0.5 text-sm text-[var(--color-ink)]">{value}</dd>
-            </div>
-          ))}
-          <div className="sm:col-span-2">
-            <dt className="label">Colors / finishes</dt>
-            <dd className="mt-1 flex flex-wrap gap-2">
-              {colors.length === 0 && <span className="text-sm">—</span>}
-              {colors.map((c) => (
-                <span
-                  key={c.name}
-                  className="flex items-center gap-2 rounded-full bg-[var(--color-sheet)] px-3 py-1 text-xs font-medium"
-                >
-                  <span
-                    className="h-2.5 w-2.5 rounded-full border border-black/20"
-                    style={{ backgroundColor: c.hex }}
-                  />
-                  {c.name} ({c.code})
-                </span>
-              ))}
-            </dd>
-          </div>
-        </dl>
-      </div>
+      <div className="space-y-6">
+        <ProductCard
+          product={product}
+          categoryName={categories?.find((c) => c.id === product.category_id)?.name ?? null}
+          colors={resolveColors(product.colors ?? [], settings.color_hex)}
+          photos={images}
+        />
 
-      <div className="card mt-4 max-w-2xl p-5">
-        <h3 className="text-sm font-bold text-[var(--color-ink)]">Photos</h3>
-        {photos.length === 0 ? (
-          <p className="mt-2 text-xs text-[var(--color-muted)]">
-            No photos yet. Use Edit to upload them.
-          </p>
-        ) : (
-          <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
-            {photos.map((img) => (
-              <figure key={img.id}>
-                <ImagePreview
-                  src={img.url}
-                  alt={`${product.name}${img.color ? ` — ${img.color}` : ""}`}
-                  sizes="(max-width: 640px) 50vw, 160px"
-                  className="aspect-square w-full rounded-lg border border-slate-200 bg-slate-100"
-                />
-                <figcaption className="mt-1 text-[11px] text-[var(--color-muted)]">
-                  {img.color || "General"}
-                  {img.is_primary && " · ★ Primary"}
-                </figcaption>
-              </figure>
-            ))}
+        {!sheet && (
+          <div className="card border-dashed p-4 text-center text-sm text-[var(--color-muted)]">
+            No costing saved for this product yet. Click <strong>Edit</strong> to cost it in the calculator.
           </div>
         )}
+
+        {sections.map((s) => (
+          <CostTable
+            key={s.id}
+            badge={String(s.sort_order)}
+            title={s.name}
+            lines={lines.filter((l) => l.stage_code === s.code)}
+            overhead={num(overheads[s.code.toLowerCase()])}
+          />
+        ))}
+        {boughtOut.length > 0 && <CostTable badge="B" title="Bought Out Items" lines={boughtOut} />}
+
+        <PriceSummary
+          totals={totals}
+          costPrice={product.cost_price}
+          markupPct={sheet?.markup_pct ?? product.markup_pct}
+          sellingPrice={product.default_sp}
+          notes={sheet?.notes}
+        />
       </div>
     </>
   );
