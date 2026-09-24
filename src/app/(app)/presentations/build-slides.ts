@@ -2,7 +2,8 @@
 
 import { closingSlide, coverSlide, hamperSlide, productSlide, type Size } from "@/lib/presentation";
 import { loadImage } from "@/components/studio/render";
-import { loadDeckData, type DeckItem, type SlideInput } from "./actions";
+import { loadDeckData } from "./actions";
+import type { DeckItem, SlideInput } from "./deck-schemas";
 
 export type DeckText = {
   title: string;

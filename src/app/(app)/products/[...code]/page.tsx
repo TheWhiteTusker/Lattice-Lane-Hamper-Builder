@@ -8,6 +8,7 @@ import { PageHeader } from "@/components/ui";
 import { ImagePreview } from "@/components/image-preview";
 import { ProductForm } from "../product-form";
 import type { Category, Product, ProductImage } from "@/lib/types";
+import { costingHref } from "../../cost-calculator/href";
 
 export default async function ProductPage({
   params,
@@ -81,7 +82,7 @@ export default async function ProductPage({
     <>
       <PageHeader title={product.name} subtitle={product.code}>
         <Link
-          href={`/cost-calculator?product=${encodeURIComponent(product.code)}`}
+          href={costingHref(product.code)}
           className="btn-secondary"
         >
           Cost Calculator

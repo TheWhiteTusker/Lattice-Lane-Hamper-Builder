@@ -4,7 +4,8 @@ import { loadSettings } from "@/lib/settings";
 import { PageHeader } from "@/components/ui";
 import { LoadMore } from "@/components/load-more";
 import { pageLimit } from "@/lib/paging";
-import { formatMoney, formatPct } from "@/lib/pricing";
+import { HamperRow } from "./_list/hamper-row";
+import { Range } from "./_list/range";
 import type { HamperSummary } from "@/lib/types";
 
 type Search = Promise<Record<string, string | string[] | undefined>>;
@@ -155,58 +156,7 @@ export default async function HampersPage({ searchParams }: { searchParams: Sear
                 </td>
               </tr>
             ) : (
-              rows.map((h) => (
-                <tr key={h.id}>
-                  <td>
-                    <Link href={`/hampers/${encodeURIComponent(h.code)}`} className="block h-10 w-10">
-                      {h.image_url ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img
-                          src={h.image_url}
-                          alt=""
-                          loading="lazy"
-                          className="h-10 w-10 rounded-md border border-[var(--color-line)] object-cover"
-                        />
-                      ) : (
-                        <span className="block h-10 w-10 rounded-md border border-dashed border-[var(--color-line)] bg-[var(--color-paper)]" />
-                      )}
-                    </Link>
-                  </td>
-                  <td className="font-mono whitespace-nowrap">
-                    <Link href={`/hampers/${encodeURIComponent(h.code)}`} className="hover:underline">
-                      {h.code}
-                    </Link>
-                  </td>
-                  <td>
-                    <Link href={`/hampers/${encodeURIComponent(h.code)}`} className="hover:underline">
-                      {h.name}
-                    </Link>
-                  </td>
-                  <td className="text-[var(--color-muted)]">{h.collection ?? "—"}</td>
-                  <td>
-                    <span className="badge">{h.status}</span>
-                  </td>
-                  <td className="num">{h.number_of_items}</td>
-                  <td className="num">{formatMoney(h.total_cp)}</td>
-                  <td className="num">
-                    {h.final_catalogue_sp == null ? (
-                      <span className="text-[var(--color-muted)]">not priced</span>
-                    ) : (
-                      formatMoney(h.final_catalogue_sp)
-                    )}
-                  </td>
-                  <td
-                    className={`num ${h.gross_profit != null && h.gross_profit < 0 ? "text-red-700" : ""}`}
-                  >
-                    {h.gross_profit == null ? "—" : formatMoney(h.gross_profit)}
-                  </td>
-                  <td
-                    className={`num ${h.final_margin != null && h.final_margin < 0 ? "text-red-700" : ""}`}
-                  >
-                    {h.final_margin == null ? "—" : formatPct(h.final_margin)}
-                  </td>
-                </tr>
-              ))
+              rows.map((h) => <HamperRow key={h.id} h={h} />)
             )}
           </tbody>
         </table>
@@ -214,40 +164,5 @@ export default async function HampersPage({ searchParams }: { searchParams: Sear
 
       <LoadMore shown={rows.length} total={total} />
     </>
-  );
-}
-
-/** A from-to pair on one numeric column; either end may be left blank. */
-function Range({
-  name,
-  label,
-  min,
-  max,
-}: {
-  name: string;
-  label: string;
-  min: string;
-  max: string;
-}) {
-  return (
-    <div className="flex items-center gap-1">
-      <input
-        name={`${name}_min`}
-        aria-label={`Minimum ${label}`}
-        inputMode="decimal"
-        defaultValue={min}
-        placeholder="min"
-        className="input input-num"
-      />
-      <span className="text-[var(--color-muted)]">–</span>
-      <input
-        name={`${name}_max`}
-        aria-label={`Maximum ${label}`}
-        inputMode="decimal"
-        defaultValue={max}
-        placeholder="max"
-        className="input input-num"
-      />
-    </div>
   );
 }
