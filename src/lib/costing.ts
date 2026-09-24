@@ -101,6 +101,17 @@ export type CostSheetTotals = {
   target_margin: number;
 };
 
+/**
+ * A product's selling price after its cost changes: scaled with the cost so
+ * its margin holds, including a price that was set by hand. Without a
+ * previous cost and price there is nothing to scale, so `fallbackSp` is used.
+ */
+export function scaledPrice(oldCost: unknown, oldSp: unknown, newCost: number, fallbackSp: number) {
+  const cost = num(oldCost);
+  const sp = num(oldSp);
+  return cost > 0 && sp > 0 ? round2((sp * newCost) / cost) : fallbackSp;
+}
+
 /** Overhead % per stage code, e.g. { material: 10 }; added on top of that stage's lines. */
 export type StageOverheads = Record<string, unknown>;
 

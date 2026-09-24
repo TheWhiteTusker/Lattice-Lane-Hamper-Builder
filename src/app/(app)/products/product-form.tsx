@@ -3,21 +3,14 @@
 import { useActionState, useState } from "react";
 import Link from "next/link";
 import { saveProduct, deleteProduct } from "./actions";
-import {
-  formatProductCode,
-  parseProductCode,
-  STANDARD_PRODUCT_COLORS,
-  colorCode,
-  resolveColors,
-  deriveCategoryCode,
-  type ProductColor,
-} from "@/lib/product-code";
+import { STANDARD_PRODUCT_COLORS, resolveColors, type ProductColor } from "@/lib/product-code";
 import { ProductImagesManager } from "@/components/product-images-manager";
 import type { Category, Product, ProductImage } from "@/lib/types";
 import { costingHref } from "../cost-calculator/href";
 import { CodeField } from "./_form/code-field";
 import { ColorPicker, SourceField } from "./_form/color-picker";
 import { PriceFields } from "./_form/price-fields";
+import { useAutoCode } from "./_form/use-auto-code";
 
 export function ProductForm({
   product,
@@ -35,31 +28,25 @@ export function ProductForm({
   const [state, action, pending] = useActionState(saveProduct, {});
   const [deleteState, deleteAction, deleting] = useActionState(deleteProduct, {});
 
-  const [code, setCode] = useState(product?.code ?? "");
   const [categoryId, setCategoryId] = useState(product?.category_id ?? "");
   const [source, setSource] = useState(product?.source ?? "");
   const [selectedColors, setSelectedColors] = useState<string[]>(
     product?.colors && product.colors.length > 0 ? product.colors : ["Walnut"],
   );
-
-  const categoryCode = (catId: string) => {
-    const cat = categories.find((c) => c.id === catId);
-    return cat?.code || (cat ? deriveCategoryCode(cat.name) : "LC");
-  };
+  const auto = useAutoCode(product?.code ?? "", categories, selectedColors);
+  const code = auto.code;
 
   function handleCategoryChange(newCatId: string) {
     setCategoryId(newCatId);
-    const parsed = parseProductCode(code);
-    const colCode = parsed.colorCode || (selectedColors[0] ? colorCode(selectedColors[0]) : "WL");
-    setCode(formatProductCode(categoryCode(newCatId), parsed.serial || "0001", colCode));
+    auto.categoryChanged(newCatId);
   }
 
   function handleColorSelect(colName: string) {
-    setSelectedColors((prev) => (prev.includes(colName) ? prev.filter((c) => c !== colName) : [...prev, colName]));
-    const parsed = parseProductCode(code);
-    const cat = categories.find((c) => c.id === categoryId);
-    const catCode = cat?.code || parsed.categoryCode || "LC";
-    setCode(formatProductCode(catCode, parsed.serial || "0001", colorCode(colName)));
+    const next = selectedColors.includes(colName)
+      ? selectedColors.filter((c) => c !== colName)
+      : [...selectedColors, colName];
+    setSelectedColors(next);
+    auto.colorsChanged(next);
   }
 
   return (
@@ -87,15 +74,7 @@ export function ProductForm({
         ))}
 
         <div className="grid gap-4 sm:grid-cols-2">
-          <CodeField
-            code={code}
-            onChange={setCode}
-            onAutoFormat={() =>
-              setCode(
-                formatProductCode(categoryCode(categoryId), parseProductCode(code).serial || "0001", selectedColors[0] || "Walnut"),
-              )
-            }
-          />
+          <CodeField code={code} onChange={auto.setCode} fetching={auto.fetching} />
 
           <div>
             <label className="label" htmlFor="category_id">

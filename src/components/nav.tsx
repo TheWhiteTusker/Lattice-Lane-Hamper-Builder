@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useSyncExternalStore } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
@@ -17,13 +17,13 @@ export function Nav({ profile, desktop }: { profile: Profile; desktop: boolean }
   const pathname = usePathname();
   const router = useRouter();
   const [checkingUpdate, setCheckingUpdate] = useState(false);
-  const [isDesktopClient, setIsDesktopClient] = useState(desktop);
-
-  useEffect(() => {
-    if (typeof window !== "undefined" && (window as unknown as { electron?: { isDesktop?: boolean } }).electron?.isDesktop) {
-      setIsDesktopClient(true);
-    }
-  }, []);
+  // The desktop app's preload script exposes window.electron; false while server rendering.
+  const inElectron = useSyncExternalStore(
+    () => () => {},
+    () => !!(window as unknown as { electron?: { isDesktop?: boolean } }).electron?.isDesktop,
+    () => false,
+  );
+  const isDesktopClient = desktop || inElectron;
 
   async function checkUpdates() {
     setCheckingUpdate(true);
@@ -67,10 +67,12 @@ export function Nav({ profile, desktop }: { profile: Profile; desktop: boolean }
   }
 
   // The header lockup is white artwork on transparency, so it needs the sage
-  // bar behind it — same pairing the storefront uses.
+  // bar behind it — same pairing the storefront uses. Sizes scale with the
+  // screen (clamp) so the bar fits a small laptop without scrolling; the
+  // links wrap to a second line rather than scroll if it is narrower still.
   return (
     <header className="no-print bg-[var(--color-brand)]">
-      <div className="flex items-center gap-6 whitespace-nowrap px-6 py-3">
+      <div className="flex items-center gap-[clamp(0.5rem,1.4vw,1.5rem)] whitespace-nowrap px-[clamp(0.75rem,1.8vw,1.5rem)] py-[clamp(0.5rem,0.9vw,0.75rem)]">
         <Link href="/dashboard" aria-label="Lattice Lane — dashboard" className="shrink-0">
           <Image
             src="/lattice-lane-logo.png"
@@ -78,17 +80,17 @@ export function Nav({ profile, desktop }: { profile: Profile; desktop: boolean }
             width={1768}
             height={203}
             priority
-            className="h-7 w-auto"
+            className="h-[clamp(1rem,1.6vw,1.75rem)] w-auto"
           />
         </Link>
 
-        <nav className="flex min-w-0 flex-1 items-center gap-1 overflow-x-auto">
+        <nav className="flex min-w-0 flex-1 flex-wrap items-center gap-[clamp(0.1rem,0.3vw,0.25rem)]">
           {links.map((link) => (
             <Link
               key={link.href}
               href={link.href}
               aria-current={isActive(link.href) ? "page" : undefined}
-              className={`shrink-0 rounded-full px-3 py-1.5 text-sm transition-colors ${
+              className={`shrink-0 rounded-full px-[clamp(0.4rem,0.75vw,0.75rem)] py-1.5 text-[clamp(0.75rem,0.95vw,0.875rem)] transition-colors ${
                 isActive(link.href)
                   ? "bg-[var(--color-paper)] font-medium text-[var(--color-brand-dark)]"
                   : "text-white/75 hover:bg-white/10 hover:text-white"
@@ -99,12 +101,12 @@ export function Nav({ profile, desktop }: { profile: Profile; desktop: boolean }
           ))}
         </nav>
 
-        <div className="flex shrink-0 items-center gap-3 text-sm">
+        <div className="flex shrink-0 items-center gap-[clamp(0.4rem,0.9vw,0.75rem)] text-[clamp(0.75rem,0.95vw,0.875rem)]">
           {!isDesktopClient ? (
             // Plain <a>: a file download, not a page for the router to prefetch.
             <a
               href="/updates/Lattice-Lane-Setup.exe"
-              className="btn rounded-full border border-white/30 text-white hover:bg-white/10"
+              className="btn rounded-full border border-white/30 px-[clamp(0.6rem,1vw,1rem)] text-[length:inherit] text-white hover:bg-white/10"
             >
               Download app
             </a>
@@ -113,6 +115,8 @@ export function Nav({ profile, desktop }: { profile: Profile; desktop: boolean }
               type="button"
               onClick={checkUpdates}
               disabled={checkingUpdate}
+              title="Check for updates"
+              aria-label="Check for updates"
               className="btn rounded-full border border-white/30 text-white hover:bg-white/10 text-xs px-3 py-1 flex items-center gap-1.5"
             >
               <svg
@@ -128,19 +132,19 @@ export function Nav({ profile, desktop }: { profile: Profile; desktop: boolean }
                   d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
                 />
               </svg>
-              {checkingUpdate ? "Checking…" : "Check for updates"}
+              <span className="hidden xl:inline">{checkingUpdate ? "Checking…" : "Check for updates"}</span>
             </button>
           )}
-          <span className="text-white/75">
-            {profile.full_name || "Account"}
-            <span className="ml-2 rounded-full border border-white/25 bg-white/10 px-2 py-0.5 text-[11px] font-medium text-white">
+          <span className="text-white/75" title={profile.full_name || "Account"}>
+            <span className="hidden xl:inline">{profile.full_name || "Account"}</span>
+            <span className="rounded-full border border-white/25 xl:ml-2 bg-white/10 px-2 py-0.5 text-[11px] font-medium text-white">
               {ROLE_LABEL[profile.role]}
             </span>
           </span>
           <button
             type="button"
             onClick={signOut}
-            className="btn rounded-full border border-white/30 text-white hover:bg-white/10"
+            className="btn rounded-full border border-white/30 px-[clamp(0.6rem,1vw,1rem)] text-[length:inherit] text-white hover:bg-white/10"
           >
             Sign out
           </button>

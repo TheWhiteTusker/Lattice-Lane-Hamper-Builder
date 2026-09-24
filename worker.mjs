@@ -14,7 +14,7 @@ const FILES = {
   "Lattice-Lane-Setup.exe": "application/octet-stream",
 };
 
-export default {
+const worker = {
   async fetch(request, env, ctx) {
     const name = new URL(request.url).pathname.match(/^\/updates\/([^/]+)$/)?.[1];
     const type = name && FILES[name];
@@ -37,3 +37,5 @@ export default {
     return new Response(request.method === "HEAD" ? null : file.body, { headers });
   },
 };
+
+export default worker;

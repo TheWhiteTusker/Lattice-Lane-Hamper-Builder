@@ -3,7 +3,7 @@
 import { codesForColors, type ProductColor } from "@/lib/product-code";
 import type { ProductDetails } from "./use-product-details";
 
-/** Product code with Auto-generate, and every per-colour code it will save as. */
+/** Product code (set from the category and colour), and every per-colour code it will save as. */
 export function CodeField({
   details,
   productColors,
@@ -14,23 +14,14 @@ export function CodeField({
   const { code, parsedCode, selectedColors } = details;
   return (
     <div>
-      <div className="flex items-center justify-between">
-        <label className="label" htmlFor="calc-code">
-          Product Code *
-        </label>
-        <button
-          type="button"
-          onClick={details.autoGenerateCode}
-          className="text-[11px] text-[var(--color-brand)] hover:underline"
-        >
-          Auto-generate
-        </button>
-      </div>
+      <label className="label" htmlFor="calc-code">
+        Product Code *
+      </label>
       <input
         id="calc-code"
         value={code}
         onChange={(e) => details.setCode(e.target.value.toUpperCase())}
-        placeholder="e.g. LC/0001/WL"
+        placeholder="Choose a category"
         required
         className="input mt-1 font-mono uppercase font-semibold"
       />
@@ -52,10 +43,12 @@ export function CodeField({
         </div>
       ) : (
         <div className="mt-1 flex items-center justify-between text-xs">
-          <span className={parsedCode.isValid ? "text-emerald-700 font-medium" : "text-amber-700"}>
-            {parsedCode.isValid
-              ? `✓ ${parsedCode.categoryCode}/${parsedCode.serial}/${parsedCode.colorCode} (${parsedCode.colorName})`
-              : `Format: LC/0001/WL`}
+          <span className={parsedCode.isValid ? "text-emerald-700 font-medium" : "text-[var(--color-muted)]"}>
+            {details.fetchingCode
+              ? "Finding the next number…"
+              : parsedCode.isValid
+                ? `✓ ${parsedCode.categoryCode}/${parsedCode.serial}/${parsedCode.colorCode} (${parsedCode.colorName})`
+                : "Set automatically from the category and colour"}
           </span>
         </div>
       )}

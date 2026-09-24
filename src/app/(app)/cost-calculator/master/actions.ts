@@ -1,9 +1,10 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { createClient } from "@/lib/supabase/server";
+import { createClient, isAdmin, requireUser } from "@/lib/supabase/server";
 import { describeError } from "@/lib/forms";
 import type { ProductColor } from "@/lib/product-code";
+import { repriceVariety } from "../reprice";
 
 // Every page under /cost-calculator reads the hierarchy, so refresh them all.
 const refresh = () => revalidatePath("/cost-calculator", "layout");
@@ -102,16 +103,44 @@ export async function saveCostVariety(formData: FormData) {
     sort_order,
   };
 
-  if (id) {
-    const { error } = await supabase.from("cost_varieties").update(values).eq("id", id);
-    if (error) return { error: describeError(error) };
-  } else {
+  if (!id) {
     const { error } = await supabase.from("cost_varieties").insert(values);
     if (error) return { error: describeError(error) };
+    refresh();
+    return { ok: true };
   }
 
+  // A new rate or unit reprices every product costed with this variety.
+  const { data: before } = await supabase
+    .from("cost_varieties")
+    .select("default_rate, unit")
+    .eq("id", id)
+    .maybeSingle<{ default_rate: number; unit: string }>();
+  const repricing = !!before && (Number(before.default_rate) !== default_rate || before.unit !== unit);
+  if (repricing) {
+    const { profile } = await requireUser();
+    if (!isAdmin(profile.role)) {
+      return { error: "Only an admin can change a rate or unit, because it reprices the products that use it." };
+    }
+  }
+
+  const { error } = await supabase.from("cost_varieties").update(values).eq("id", id);
+  if (error) return { error: describeError(error) };
   refresh();
-  return { ok: true };
+  if (!repricing) return { ok: true };
+
+  const res = await repriceVariety(supabase, id, default_rate, unit);
+  revalidatePath("/products");
+  revalidatePath("/products/[...code]", "page");
+  if (res.error) {
+    return { error: `Rate saved, but repricing stopped after ${res.products} product(s): ${res.error}` };
+  }
+  return {
+    ok: true,
+    message: res.products
+      ? `Rate saved. ${res.products} product${res.products === 1 ? "" : "s"} repriced; quotations and invoices keep their prices.`
+      : "Rate saved. No saved products use this variety yet.",
+  };
 }
 
 export async function deleteCostVariety(id: string) {

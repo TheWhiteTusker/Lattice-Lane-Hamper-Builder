@@ -4,54 +4,23 @@ import { CURATED_FALLBACKS, type DisplayProduct } from "./fallbacks";
 /** Whether someone is signed in, and the photos for the four scrolling columns. */
 export async function getLandingData() {
   const supabase = await createClient();
-  const [{ data: userClaims }, { data: dbProducts }, { data: dbProductImages }, { data: dbHampers }] =
-    await Promise.all([
-      supabase.auth.getClaims(),
-      supabase
-        .from("products")
-        .select("id, name, image_url, code, category_id")
-        .eq("is_active", true)
-        .not("image_url", "is", null)
-        .limit(40),
-      supabase
-        .from("product_images")
-        .select("id, url, caption, product_id")
-        .not("url", "is", null)
-        .limit(40),
-      supabase
-        .from("hampers")
-        .select("id, name, image_url, code")
-        .not("image_url", "is", null)
-        .limit(20),
-    ]);
+  const [{ data: userClaims }, { data: photos }, { data: dbHampers }] = await Promise.all([
+    supabase.auth.getClaims(),
+    // Visitors can't read the products table (it holds costs); this returns
+    // only photo, name and label for active products (migration 0019).
+    supabase.rpc("landing_photos"),
+    // Hampers only come back for signed-in users.
+    supabase.from("hampers").select("id, name, image_url, code").not("image_url", "is", null).limit(20),
+  ]);
 
   const unique = new Map<string, DisplayProduct>();
 
-  // 1. Add database products if any
-  for (const p of dbProducts ?? []) {
-    if (p.image_url && !unique.has(p.image_url)) {
-      unique.set(p.image_url, {
-        id: p.id,
-        url: p.image_url,
-        name: p.name,
-        category: p.code || "Catalog Product",
-      });
-    }
+  // 1. Catalogue product photos, then their gallery images
+  for (const photo of (photos ?? []) as DisplayProduct[]) {
+    if (photo.url && !unique.has(photo.url)) unique.set(photo.url, photo);
   }
 
-  // 2. Add extra product gallery images if any
-  for (const img of dbProductImages ?? []) {
-    if (img.url && !unique.has(img.url)) {
-      unique.set(img.url, {
-        id: img.id,
-        url: img.url,
-        name: img.caption || "Curated Item",
-        category: "Product Gallery",
-      });
-    }
-  }
-
-  // 3. Add hamper photos if any
+  // 2. Hamper photos, if signed in
   for (const h of dbHampers ?? []) {
     if (h.image_url && !unique.has(h.image_url)) {
       unique.set(h.image_url, {
@@ -63,7 +32,7 @@ export async function getLandingData() {
     }
   }
 
-  // 4. Fill in with curated fallbacks ensuring zero duplicate URLs
+  // 3. Fill in with curated fallbacks ensuring zero duplicate URLs
   for (const fallback of CURATED_FALLBACKS) {
     if (!unique.has(fallback.url)) {
       unique.set(fallback.url, fallback);
