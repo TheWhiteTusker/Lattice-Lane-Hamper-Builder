@@ -23,10 +23,10 @@ export default function LoginPage() {
       // useSearchParams still suspends, and the fallback matches the form's
       // sage ground so there is no white flash before it resolves.
       fallback={
-        <main className="flex min-h-screen items-center justify-center bg-[var(--color-brand)] px-4">
-          <div className="card w-full max-w-sm p-6">
-            <h1 className="text-lg font-semibold">Lattice Lane</h1>
-            <p className="mt-0.5 text-sm text-[var(--color-muted)]">Loading…</p>
+        <main className="flex min-h-screen items-center justify-center bg-black px-4 text-white">
+          <div className="w-full max-w-sm p-6 text-center">
+            <h1 className="text-lg font-semibold tracking-wider text-amber-100">Lattice Lane</h1>
+            <p className="mt-1 text-xs text-neutral-500">Lighting the way…</p>
           </div>
         </main>
       }

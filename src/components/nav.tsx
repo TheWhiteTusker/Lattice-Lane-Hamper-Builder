@@ -47,7 +47,7 @@ export function Nav({ profile, desktop }: { profile: Profile; desktop: boolean }
   }
 
   const links = [
-    { href: "/", label: "Dashboard" },
+    { href: "/dashboard", label: "Dashboard" },
     { href: "/hampers", label: "Hampers" },
     { href: "/presentations", label: "Presentations" },
     { href: "/quotes", label: "Quotes" },
@@ -58,7 +58,7 @@ export function Nav({ profile, desktop }: { profile: Profile; desktop: boolean }
   ];
 
   const isActive = (href: string) =>
-    href === "/" ? pathname === "/" : pathname.startsWith(href);
+    pathname === href || (href !== "/dashboard" && pathname.startsWith(href));
 
   async function signOut() {
     await createClient().auth.signOut();
@@ -71,7 +71,7 @@ export function Nav({ profile, desktop }: { profile: Profile; desktop: boolean }
   return (
     <header className="no-print bg-[var(--color-brand)]">
       <div className="flex items-center gap-6 whitespace-nowrap px-6 py-3">
-        <Link href="/" aria-label="Lattice Lane — dashboard" className="shrink-0">
+        <Link href="/dashboard" aria-label="Lattice Lane — dashboard" className="shrink-0">
           <Image
             src="/lattice-lane-logo.png"
             alt="Lattice Lane"
