@@ -1,15 +1,9 @@
-import { useState, useTransition } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
-import {
-  colorCode,
-  deriveCategoryCode,
-  formatProductCode,
-  getNextSerialForCategory,
-  parseProductCode,
-} from "@/lib/product-code";
+import { parseProductCode } from "@/lib/product-code";
 import type { Category, CostStageWithHierarchy, Product, ProductCostSheet } from "@/lib/types";
-import { getNextSerialAction } from "../actions";
 import { costingHref } from "../href";
+import { useAutoCode } from "../../products/_form/use-auto-code";
 import { matchOrigin } from "./lines";
 
 export type ProductDetails = ReturnType<typeof useProductDetails>;
@@ -29,9 +23,7 @@ export function useProductDetails({
   initialSheet?: ProductCostSheet | null;
 }) {
   const router = useRouter();
-  const [, startTransition] = useTransition();
   const [selectedProductId, setSelectedProductId] = useState(initialProduct?.id ?? "");
-  const [code, setCode] = useState(initialProduct?.code ?? initialSheet?.product_code ?? "");
   const [name, setName] = useState(initialProduct?.name ?? initialSheet?.product_name ?? "");
   const [categoryId, setCategoryId] = useState(initialProduct?.category_id ?? "");
   const [source, setSource] = useState<string>(() => matchOrigin(initialProduct?.source ?? "In-house"));
@@ -42,6 +34,9 @@ export function useProductDetails({
       : new Set(),
   );
   const [selectedColors, setSelectedColors] = useState<string[]>(initialProduct?.colors ?? ["Walnut"]);
+  // The code follows the category and colour choices (see useAutoCode).
+  const auto = useAutoCode(initialProduct?.code ?? initialSheet?.product_code ?? "", categories, selectedColors);
+  const { code, setCode } = auto;
   const [isActive, setIsActive] = useState(initialProduct ? initialProduct.is_active : true);
   const [notes, setNotes] = useState(initialSheet?.notes ?? "");
   const parsedCode = parseProductCode(code);
@@ -67,31 +62,9 @@ export function useProductDetails({
     });
   }
 
-  const categoryCode = (catId: string) => {
-    const cat = categories.find((c) => c.id === catId);
-    return cat?.code || (cat ? deriveCategoryCode(cat.name) : "LC");
-  };
-
   function changeCategory(newCatId: string) {
     setCategoryId(newCatId);
-    const catCode = categoryCode(newCatId);
-    const colCode = parsedCode.colorCode || "WL";
-    let serial = parsedCode.serial || "0001";
-    if (!selectedProductId) {
-      // Guess from the loaded list at once, then confirm with the server.
-      serial = getNextSerialForCategory(catCode, products.map((p) => p.code));
-      startTransition(async () => {
-        const res = await getNextSerialAction(catCode);
-        if (res.serial) setCode(formatProductCode(catCode, res.serial, colCode));
-      });
-    }
-    setCode(formatProductCode(catCode, serial, colCode));
-  }
-
-  async function autoGenerateCode() {
-    const catCode = categoryCode(categoryId);
-    const res = await getNextSerialAction(catCode);
-    setCode(formatProductCode(catCode, res.serial || "0001", selectedColors[0] || "Walnut"));
+    auto.categoryChanged(newCatId);
   }
 
   // A product can come in several finishes; the code suffix follows the first.
@@ -100,15 +73,12 @@ export function useProductDetails({
       ? selectedColors.filter((c) => c !== colName)
       : [...selectedColors, colName];
     setSelectedColors(next);
-    if (!next[0]) return;
-    const cat = categories.find((c) => c.id === categoryId);
-    const catCode = cat?.code || parsedCode.categoryCode || "LC";
-    setCode(formatProductCode(catCode, parsedCode.serial || "0001", colorCode(next[0])));
+    auto.colorsChanged(next);
   }
 
   return {
     selectedProductId, setSelectedProductId, code, setCode, name, setName, categoryId, source,
     collapsedStages, selectedColors, isActive, setIsActive, notes, setNotes, parsedCode,
-    selectProduct, changeOrigin, toggleStage, changeCategory, autoGenerateCode, toggleColor,
+    selectProduct, changeOrigin, toggleStage, changeCategory, toggleColor, fetchingCode: auto.fetching,
   };
 }
