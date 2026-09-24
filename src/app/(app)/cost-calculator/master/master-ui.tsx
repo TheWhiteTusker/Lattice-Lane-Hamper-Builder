@@ -9,8 +9,8 @@ export type MasterCtx = {
   isOpen: (id: string) => boolean;
   toggle: (id: string) => void;
   expand: (id: string) => void;
-  /** Runs a server action, showing its error or `success` in the banner. */
-  run: (action: () => Promise<{ error?: string }>, success: string, after?: () => void) => void;
+  /** Runs a server action, showing its error, its message, or `success` in the banner. */
+  run: (action: () => Promise<{ error?: string; message?: string }>, success: string, after?: () => void) => void;
   editVariety: (subcategoryId: string, variety: Partial<CostVariety>) => void;
 };
 

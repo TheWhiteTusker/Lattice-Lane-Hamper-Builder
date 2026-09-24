@@ -4,6 +4,7 @@ import {
   calculateDimensionArea,
   calculateLineCost,
   calculateCostSheetTotals,
+  scaledPrice,
   withOverhead,
 } from "./costing.ts";
 
@@ -288,4 +289,13 @@ test("the exact area is costed; the stored area is rounded for display", () => {
   const line = calculateLineCost({ stage_code: "material", unit: "sq ft", rate: 1000, length: 5, breadth: 5, dimension_unit: "inch", qty: 1, wastage_pct: 0 });
   assert.equal(line.calculated_area, 0.17);
   assert.equal(line.line_total, 173.61);
+});
+
+test("a repriced product keeps its margin, including a hand-set price", () => {
+  // Priced by the markup formula: 55.5 cost -> 277.5 (80% margin); cost +10% -> price +10%
+  assert.equal(scaledPrice(55.5, 277.5, 61.05, 999), 305.25);
+  // Hand-set price above the markup price stays proportionally above it
+  assert.equal(scaledPrice(321.78, 2883.3, 353.96, 999), 3171.65);
+  // Nothing to scale from: use the markup price given
+  assert.equal(scaledPrice(0, 0, 100, 500), 500);
 });

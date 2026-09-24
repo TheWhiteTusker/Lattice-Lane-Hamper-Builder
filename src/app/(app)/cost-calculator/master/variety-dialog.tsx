@@ -87,6 +87,13 @@ export function VarietyDialog({
           </div>
         </div>
 
+        {variety.id && (
+          <p className="-mt-2 rounded-md bg-amber-50 px-2 py-1.5 text-[11px] text-amber-900">
+            A new rate or unit reprices every product costed with this variety. Quotations and invoices keep their
+            prices.
+          </p>
+        )}
+
         <div className="grid grid-cols-2 gap-3">
           <div>
             <label className="label" htmlFor="variety-wastage">

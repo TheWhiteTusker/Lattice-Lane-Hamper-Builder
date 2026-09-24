@@ -47,7 +47,7 @@ export function CostMasterView({
         const res = await action();
         if (res.error) return setFeedback({ error: res.error });
         after?.();
-        setFeedback({ success });
+        setFeedback({ success: res.message ?? success });
       });
     },
     editVariety: (subcategoryId, variety) => setEditing({ subcategoryId, variety }),
