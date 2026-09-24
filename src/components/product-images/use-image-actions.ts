@@ -81,12 +81,12 @@ export function useImageActions(
   }
 
   function remove(imageId: string) {
-    if (!confirm("Are you sure you want to delete this image?")) return;
+    if (!confirm("Move this image to the Bin? It will stay in the Bin for 30 days and can be restored anytime.")) return;
     startTransition(async () => {
       const res = await deleteProductImage(imageId, productId);
       if (res.error) return setFeedback({ error: res.error });
       setImages((prev) => prev.filter((img) => img.id !== imageId));
-      setFeedback({ success: "Image deleted successfully." });
+      setFeedback({ success: "Image moved to Bin. You can restore it from the Bin within 30 days." });
     });
   }
 

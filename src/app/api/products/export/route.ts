@@ -17,6 +17,7 @@ export async function GET() {
   const { data } = await supabase
     .from("products")
     .select("*, categories(name, counts_as_item)")
+    .is("deleted_at", null)
     .order("code")
     .returns<ProductWithCategory[]>();
 

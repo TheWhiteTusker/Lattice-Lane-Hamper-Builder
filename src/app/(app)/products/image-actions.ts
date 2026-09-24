@@ -66,7 +66,8 @@ export async function uploadProductImage(formData: FormData): Promise<ImageActio
       const { count } = await supabase
         .from("product_images")
         .select("id", { count: "exact", head: true })
-        .eq("product_id", productId);
+        .eq("product_id", productId)
+        .is("deleted_at", null);
       if (count === 0) {
         // Automatically make first image primary
         await supabase

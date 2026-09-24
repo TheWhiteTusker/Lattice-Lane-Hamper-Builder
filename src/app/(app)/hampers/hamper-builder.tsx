@@ -185,10 +185,18 @@ export function HamperBuilder({
             </button>
           </form>
 
-          <form action={delAction} className="ml-auto">
+          <form
+            action={delAction}
+            className="ml-auto"
+            onSubmit={(e) => {
+              if (!confirm(`Move ${hamper.name} to the Bin? It will stay in the Bin for 30 days and can be restored anytime.`)) {
+                e.preventDefault();
+              }
+            }}
+          >
             <input type="hidden" name="id" value={hamper.id} />
             <button type="submit" className="btn-danger" disabled={deleting}>
-              {deleting ? "Deleting…" : "Delete hamper"}
+              {deleting ? "Moving to Bin…" : "Move to Bin"}
             </button>
           </form>
         </div>

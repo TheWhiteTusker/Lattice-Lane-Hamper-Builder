@@ -67,6 +67,18 @@ export default async function HampersPage({ searchParams }: { searchParams: Sear
         )}
       </PageHeader>
 
+      {one(params.deleted) === "1" && (
+        <div className="mb-4 flex items-center justify-between rounded-lg border border-[var(--color-line)] bg-[#faf8ee] px-4 py-3 text-sm text-[var(--color-ink)] shadow-xs">
+          <div className="flex items-center gap-2">
+            <span className="inline-block h-2 w-2 rounded-full bg-emerald-600" />
+            <span>Hamper moved to Bin. It will remain in the Bin for 30 days and can be restored anytime.</span>
+          </div>
+          <Link href="/bin?tab=hampers" className="font-semibold text-[var(--color-brand)] underline hover:text-[var(--color-brand-dark)]">
+            Open Bin →
+          </Link>
+        </div>
+      )}
+
       {/* The form wraps the whole table so every filter can sit in the header
           cell of the column it filters. */}
       <form className="card overflow-x-auto">

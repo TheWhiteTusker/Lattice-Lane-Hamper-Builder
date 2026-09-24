@@ -23,6 +23,7 @@ export default async function ProductsPage({ searchParams }: { searchParams: Sea
   let query = supabase
     .from("products")
     .select("*, categories(name, counts_as_item)", { count: "exact" })
+    .is("deleted_at", null)
     .order("code");
 
   if (q) query = query.or(`name.ilike.%${q}%,code.ilike.%${q}%,source.ilike.%${q}%`);
@@ -60,6 +61,18 @@ export default async function ProductsPage({ searchParams }: { searchParams: Sea
           </>
         )}
       </PageHeader>
+
+      {one(params.deleted) === "1" && (
+        <div className="mb-4 flex items-center justify-between rounded-lg border border-[var(--color-line)] bg-[#faf8ee] px-4 py-3 text-sm text-[var(--color-ink)] shadow-xs">
+          <div className="flex items-center gap-2">
+            <span className="inline-block h-2 w-2 rounded-full bg-emerald-600" />
+            <span>Product moved to Bin. It will remain in the Bin for 30 days and can be restored anytime.</span>
+          </div>
+          <Link href="/bin?tab=products" className="font-semibold text-[var(--color-brand)] underline hover:text-[var(--color-brand-dark)]">
+            Open Bin →
+          </Link>
+        </div>
+      )}
 
       <form className="card mb-4 flex flex-wrap items-end gap-3 p-3">
         <div className="min-w-[220px] flex-1">

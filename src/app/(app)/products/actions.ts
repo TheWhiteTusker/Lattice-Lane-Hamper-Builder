@@ -80,19 +80,17 @@ export async function deleteProduct(
   if (!id) return { error: "Missing product." };
 
   const supabase = await createClient();
-  const { error } = await supabase.from("products").delete().eq("id", id);
+  const { error } = await supabase
+    .from("products")
+    .update({ deleted_at: new Date().toISOString() })
+    .eq("id", id);
 
-  // A product used by a saved hamper cannot be deleted outright - the snapshot
-  // on hamper_items keeps the history, so retiring it is the right move.
   if (error) {
-    return {
-      error:
-        describeError(error) +
-        " Mark it inactive instead - saved hampers keep their own copy of the price.",
-    };
+    return { error: describeError(error) };
   }
 
   revalidatePath("/products");
+  revalidatePath("/bin");
   redirect("/products?deleted=1");
 }
 

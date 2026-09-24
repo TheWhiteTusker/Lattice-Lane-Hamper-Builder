@@ -40,6 +40,7 @@ export async function loadQuoteOptions(supabase: SupabaseClient) {
       .from("products")
       .select("id, code, name, default_sp")
       .eq("is_active", true)
+      .is("deleted_at", null)
       .order("code")
       .returns<ProductOption[]>(),
     supabase.from("clients").select("*").order("name").returns<Client[]>(),

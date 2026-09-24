@@ -31,6 +31,7 @@ export async function loadCatalog(supabase: SupabaseClient) {
         "id, code, name, category_id, source, cost_price, markup_pct, target_margin, default_sp, colors, image_url, categories(name, counts_as_item)",
       )
       .eq("is_active", true)
+      .is("deleted_at", null)
       .order("name")
       .returns<ProductRow[]>(),
     supabase

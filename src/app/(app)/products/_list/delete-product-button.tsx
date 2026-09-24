@@ -11,7 +11,7 @@ export function DeleteProductButton({ id, label }: { id: string; label: string }
     <form
       action={action}
       onSubmit={(e) => {
-        if (!confirm(`Delete ${label}? Its photos are deleted too. This cannot be undone.`)) e.preventDefault();
+        if (!confirm(`Move ${label} to the Bin? It will stay in the Bin for 30 days and can be restored anytime.`)) e.preventDefault();
       }}
       className="inline"
     >
@@ -21,7 +21,7 @@ export function DeleteProductButton({ id, label }: { id: string; label: string }
         disabled={pending}
         className="font-medium text-red-700 hover:underline disabled:opacity-50"
       >
-        {pending ? "Deleting…" : "Delete"}
+        {pending ? "Moving to Bin…" : "Delete"}
       </button>
       {state.error && (
         <span role="alert" className="mt-1 block max-w-[240px] whitespace-normal text-left text-xs text-red-700">

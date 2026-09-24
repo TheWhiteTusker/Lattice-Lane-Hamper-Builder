@@ -28,6 +28,7 @@ export default async function ProductPage({
       .from("products")
       .select("*")
       .eq("code", decodedCode)
+      .is("deleted_at", null)
       .maybeSingle<Product>(),
     supabase.from("categories").select("*").order("sort_order").order("name").returns<Category[]>(),
     loadSettings(supabase),
@@ -39,6 +40,7 @@ export default async function ProductPage({
     .from("product_images")
     .select("*")
     .eq("product_id", product.id)
+    .is("deleted_at", null)
     .order("sort_order")
     .order("created_at")
     .returns<ProductImage[]>();

@@ -13,6 +13,7 @@ export async function loadPickerData(supabase: SupabaseClient): Promise<PickerDa
       .from("products")
       .select("id, code, name, default_sp, image_url")
       .eq("is_active", true)
+      .is("deleted_at", null)
       .order("name")
       .returns<{ id: string; code: string; name: string; default_sp: number | null; image_url: string | null }[]>(),
   ]);

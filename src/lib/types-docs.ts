@@ -18,6 +18,7 @@ export type Hamper = {
   /** Designer layout, see src/lib/hamper-canvas.ts. */
   canvas: unknown | null;
   image_url: string | null;
+  deleted_at?: string | null;
 };
 
 export type HamperItem = {
@@ -60,6 +61,7 @@ export type HamperSummary = {
   updated_at: string;
   line_count: number;
   image_url: string | null;
+  deleted_at?: string | null;
 };
 
 export type Quote = {

@@ -153,7 +153,15 @@ export function ProductForm({
       </div>
 
       {product && (
-        <form action={deleteAction} className="mt-4 max-w-2xl">
+        <form
+          action={deleteAction}
+          className="mt-4 max-w-2xl"
+          onSubmit={(e) => {
+            if (!confirm(`Move ${product.name} to the Bin? It will stay in the Bin for 30 days and can be restored anytime.`)) {
+              e.preventDefault();
+            }
+          }}
+        >
           <input type="hidden" name="id" value={product.id} />
           {deleteState.error && (
             <p role="alert" className="mb-2 text-sm text-red-700">
@@ -161,7 +169,7 @@ export function ProductForm({
             </p>
           )}
           <button type="submit" className="btn-danger" disabled={deleting}>
-            {deleting ? "Deleting…" : "Delete product"}
+            {deleting ? "Moving to Bin…" : "Move to Bin"}
           </button>
         </form>
       )}

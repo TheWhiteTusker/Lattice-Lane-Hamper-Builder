@@ -41,6 +41,7 @@ export function ProductsPanel({
       .from("product_images")
       .select("url")
       .eq("product_id", p.id)
+      .is("deleted_at", null)
       .order("is_primary", { ascending: false })
       .order("sort_order")
       .returns<{ url: string }[]>();

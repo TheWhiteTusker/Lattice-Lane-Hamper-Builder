@@ -21,7 +21,7 @@ export default async function Dashboard() {
       .order("updated_at", { ascending: false })
       .limit(6)
       .returns<QuoteSummary[]>(),
-    supabase.from("products").select("id", { count: "exact", head: true }).eq("is_active", true),
+    supabase.from("products").select("id", { count: "exact", head: true }).eq("is_active", true).is("deleted_at", null),
     supabase
       .from("quotes")
       .select("doc_no, client_name, follow_up_date, status")

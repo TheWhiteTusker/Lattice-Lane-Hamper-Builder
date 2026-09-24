@@ -23,6 +23,7 @@ export default async function HamperPage({
     .from("hampers")
     .select("*")
     .eq("code", decodeURIComponent(code))
+    .is("deleted_at", null)
     .maybeSingle<Hamper>();
 
   if (!hamper) notFound();

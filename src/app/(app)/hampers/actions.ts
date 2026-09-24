@@ -95,11 +95,14 @@ export async function deleteHamper(
 
   const supabase = await createClient();
 
-  // Quote lines keep hamper_code and the price they were quoted at, so past
-  // quotations stay intact when a hamper is retired.
-  const { error } = await supabase.from("hampers").delete().eq("id", id);
+  // Soft delete: move to bin
+  const { error } = await supabase
+    .from("hampers")
+    .update({ deleted_at: new Date().toISOString() })
+    .eq("id", id);
   if (error) return { error: describeError(error) };
 
   revalidatePath("/hampers");
+  revalidatePath("/bin");
   redirect("/hampers?deleted=1");
 }

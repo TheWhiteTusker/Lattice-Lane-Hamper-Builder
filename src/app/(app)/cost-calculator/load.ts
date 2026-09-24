@@ -48,6 +48,7 @@ export async function loadProductCosting(supabase: SupabaseClient, code: string)
     .from("products")
     .select("*")
     .eq("code", code)
+    .is("deleted_at", null)
     .maybeSingle<Product>();
   if (!product) return null;
 
@@ -61,6 +62,7 @@ export async function loadProductCosting(supabase: SupabaseClient, code: string)
       .from("product_images")
       .select("*")
       .eq("product_id", product.id)
+      .is("deleted_at", null)
       .order("sort_order")
       .order("created_at")
       .returns<ProductImage[]>(),

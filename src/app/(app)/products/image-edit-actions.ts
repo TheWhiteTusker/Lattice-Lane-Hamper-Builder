@@ -93,25 +93,24 @@ export async function deleteProductImage(
 
     if (!img) return { error: "Image not found." };
 
-    // Delete from storage if uploaded to Supabase
-    if (img.storage_path) {
-      await supabase.storage.from("product-images").remove([img.storage_path]);
-    }
-
-    // Delete row
+    // Soft delete: move to bin (preserve in storage until permanently deleted)
     const { error: delError } = await supabase
       .from("product_images")
-      .delete()
+      .update({
+        deleted_at: new Date().toISOString(),
+        is_primary: false,
+      })
       .eq("id", imageId);
 
     if (delError) return { error: describeError(delError) };
 
-    // If this was primary, update products.image_url to next available or null
+    // If this was primary, update products.image_url to next available active image or null
     if (img.is_primary) {
       const { data: nextImg } = await supabase
         .from("product_images")
         .select("*")
         .eq("product_id", productId)
+        .is("deleted_at", null)
         .order("sort_order")
         .order("created_at")
         .limit(1)
@@ -136,6 +135,7 @@ export async function deleteProductImage(
 
     revalidatePath("/products");
     revalidatePath("/hampers");
+    revalidatePath("/bin");
     return { ok: true };
   } catch (err: unknown) {
     return { error: describeError(err) };

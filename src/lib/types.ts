@@ -37,6 +37,7 @@ export type ProductImage = {
   caption?: string | null;
   created_at: string;
   updated_at: string;
+  deleted_at?: string | null;
 };
 
 export type Product = {
@@ -55,6 +56,7 @@ export type Product = {
   is_active: boolean;
   created_at: string;
   updated_at: string;
+  deleted_at?: string | null;
 };
 
 /** Product joined to its category, the shape the builder needs. */
