@@ -81,23 +81,26 @@ export async function saveCostSheetAndProduct(payload: SaveCostSheetPayload) {
     const productId = product.id;
 
     // 2. Save its cost sheet
+    const sheetValues = {
+      product_name: name,
+      material_total: totals.material_total,
+      hardware_total: totals.hardware_total,
+      finishing_total: totals.finishing_total,
+      machine_total: totals.machine_total,
+      total_cost: totals.total_cost,
+      markup_pct: totals.markup_pct,
+      calculated_sp: finalSellingPrice,
+      stage_overheads: stageOverheads,
+      notes: payload.notes || null,
+      created_by: user.id,
+    };
     const sheet = await saveRow(
       supabase,
       "product_cost_sheets",
       {
+        ...sheetValues,
         product_id: productId,
         product_code: code,
-        product_name: name,
-        material_total: totals.material_total,
-        hardware_total: totals.hardware_total,
-        finishing_total: totals.finishing_total,
-        machine_total: totals.machine_total,
-        total_cost: totals.total_cost,
-        markup_pct: totals.markup_pct,
-        calculated_sp: finalSellingPrice,
-        stage_overheads: stageOverheads,
-        notes: payload.notes || null,
-        created_by: user.id,
       },
       payload.sheetId,
       ["product_id", productId],
@@ -114,13 +117,24 @@ export async function saveCostSheetAndProduct(payload: SaveCostSheetPayload) {
       if (lErr) return { error: `Error saving cost lines: ${describeError(lErr)}` };
     }
 
-    // 4. One sibling product per extra colour
-    const saved = await saveColorVariants(supabase, code, productId, colors, productValues);
+    // 4. One sibling product per extra colour, including their cost sheets
+    const saved = await saveColorVariants(
+      supabase,
+      code,
+      productId,
+      colors,
+      productValues,
+      sheetValues,
+      preparedLines,
+    );
     if (saved.error !== undefined) return { error: saved.error };
 
     revalidatePath("/cost-calculator", "layout");
     revalidatePath("/products");
     revalidatePath(`/products/${encodeURIComponent(code)}`);
+    for (const v of saved.variants) {
+      revalidatePath(`/products/${encodeURIComponent(v.code)}`);
+    }
     revalidatePath("/hampers");
 
     return {

@@ -1,5 +1,6 @@
+import Link from "next/link";
 import { ImagePreview } from "@/components/image-preview";
-import type { ProductColor } from "@/lib/product-code";
+import { codesForColors, type ProductColor } from "@/lib/product-code";
 import type { Product, ProductImage } from "@/lib/types";
 
 /** Code, category, origin, colours and photos, as the calculator's top card shows them. */
@@ -34,17 +35,31 @@ export function ProductCard({
 
       <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-[var(--color-border)] pt-4">
         <div className="flex flex-wrap items-center gap-2">
-          <span className="text-xs font-semibold text-[var(--color-ink)]">Color finishes</span>
+          <span className="text-xs font-semibold text-[var(--color-ink)]">Color finishes:</span>
           {colors.length === 0 && <span className="text-xs text-[var(--color-muted)]">—</span>}
-          {colors.map((c) => (
-            <span
-              key={c.name}
-              className="flex items-center gap-1.5 rounded-full bg-[var(--color-sheet)] px-2.5 py-1 text-xs font-medium"
-            >
-              <span className="h-2.5 w-2.5 rounded-full border border-black/20" style={{ backgroundColor: c.hex }} />
-              {c.name} ({c.code})
-            </span>
-          ))}
+          {colors.map((c) => {
+            const siblingCode = codesForColors(product.code, [c.name])[0]?.code ?? product.code;
+            const isCurrent = siblingCode === product.code;
+            return isCurrent ? (
+              <span
+                key={c.name}
+                className="flex items-center gap-1.5 rounded-full bg-[var(--color-brand)] px-2.5 py-1 text-xs font-bold text-white shadow-xs"
+              >
+                <span className="h-2.5 w-2.5 rounded-full border border-white/40" style={{ backgroundColor: c.hex }} />
+                {c.name} ({c.code})
+              </span>
+            ) : (
+              <Link
+                key={c.name}
+                href={`/products/${encodeURIComponent(siblingCode)}`}
+                className="flex items-center gap-1.5 rounded-full bg-[var(--color-sheet)] px-2.5 py-1 text-xs font-medium hover:bg-slate-200 transition-colors"
+                title={`View ${c.name} variant`}
+              >
+                <span className="h-2.5 w-2.5 rounded-full border border-black/20" style={{ backgroundColor: c.hex }} />
+                {c.name} ({c.code})
+              </Link>
+            );
+          })}
         </div>
         <span className={`badge ${product.is_active ? "" : "opacity-70"}`}>
           {product.is_active ? "Active in Product Master & Hamper Builder" : "Inactive"}

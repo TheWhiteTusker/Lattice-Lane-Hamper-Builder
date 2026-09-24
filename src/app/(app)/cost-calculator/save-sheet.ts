@@ -47,21 +47,25 @@ export async function saveRow(
   id: string | null | undefined,
   [column, value]: [string, string],
 ): Promise<{ id: string; error?: undefined } | { id?: undefined; error: string }> {
+  // When saving a product, always clear deleted_at so soft-deleted records in the bin are restored
+  const rowValues = table === "products" ? { ...values, deleted_at: null } : values;
+
   if (!id) {
     const { data } = await supabase.from(table).select("id").eq(column, value).maybeSingle();
     id = data?.id as string | undefined;
   }
   if (id) {
-    const { error } = await supabase.from(table).update(values).eq("id", id);
+    const { error } = await supabase.from(table).update(rowValues).eq("id", id);
     return error ? { error: describeError(error) } : { id };
   }
-  const { data, error } = await supabase.from(table).insert(values).select("id").single();
+  const { data, error } = await supabase.from(table).insert(rowValues).select("id").single();
   return error || !data ? { error: describeError(error) } : { id: data.id as string };
 }
 
 /**
  * One sibling product per extra colour, same costing and price. Saved by
- * code, so re-saving updates rather than duplicates.
+ * code, so re-saving updates rather than duplicates. Also saves matching
+ * cost sheet and cost lines so sibling variants have complete costing.
  */
 export async function saveColorVariants(
   supabase: SupabaseClient,
@@ -69,15 +73,38 @@ export async function saveColorVariants(
   productId: string,
   colors: string[],
   productValues: Record<string, unknown>,
+  sheetValues?: Record<string, unknown>,
+  lines?: Partial<ProductCostLine>[],
 ) {
   const variants: { color: string; code: string; id: string }[] = [];
   if (colors[0]) variants.push({ color: colors[0], code, id: productId });
   for (const { color, code: variantCode } of codesForColors(code, colors.slice(1))) {
     if (variantCode === code) continue;
-    const values = { ...productValues, code: variantCode, colors: [color] };
+    const values = { ...productValues, code: variantCode, colors: [color], deleted_at: null };
     const saved = await saveRow(supabase, "products", values, null, ["code", variantCode]);
     if (saved.error !== undefined) return { error: `Error saving ${variantCode}: ${saved.error}` };
-    variants.push({ color, code: variantCode, id: saved.id });
+    const variantId = saved.id;
+    variants.push({ color, code: variantCode, id: variantId });
+
+    if (sheetValues) {
+      const sheet = await saveRow(
+        supabase,
+        "product_cost_sheets",
+        {
+          ...sheetValues,
+          product_id: variantId,
+          product_code: variantCode,
+        },
+        null,
+        ["product_id", variantId],
+      );
+      if (sheet.id && lines && lines.length > 0) {
+        await supabase.from("product_cost_lines").delete().eq("sheet_id", sheet.id);
+        await supabase
+          .from("product_cost_lines")
+          .insert(lines.map((l) => ({ ...l, sheet_id: sheet.id })));
+      }
+    }
   }
   return { variants };
 }

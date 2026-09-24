@@ -66,15 +66,41 @@ export async function saveProduct(
           colors: [color],
         }));
 
-  const { error } = id
-    ? await supabase.from("products").update(values).eq("id", id)
-    : await supabase.from("products").insert(rows);
+  if (id) {
+    const { error } = await supabase
+      .from("products")
+      .update({ ...values, deleted_at: null })
+      .eq("id", id);
+    if (error) return { error: describeError(error) };
+  } else {
+    for (const r of rows) {
+      const { data: existing } = await supabase
+        .from("products")
+        .select("id")
+        .eq("code", r.code)
+        .maybeSingle();
 
-  if (error) return { error: describeError(error) };
+      if (existing) {
+        const { error } = await supabase
+          .from("products")
+          .update({ ...r, deleted_at: null })
+          .eq("id", existing.id);
+        if (error) return { error: describeError(error) };
+      } else {
+        const { error } = await supabase
+          .from("products")
+          .insert({ ...r, deleted_at: null });
+        if (error) return { error: describeError(error) };
+      }
+    }
+  }
 
+  const targetCode = rows[0]?.code ?? values.code;
   revalidatePath("/products");
-  revalidatePath(`/products/${encodeURIComponent(values.code)}`);
-  redirect(`/products/${encodeURIComponent(values.code)}`);
+  for (const r of rows) {
+    revalidatePath(`/products/${encodeURIComponent(r.code)}`);
+  }
+  redirect(`/products/${encodeURIComponent(targetCode)}`);
 }
 
 export async function deleteProduct(
