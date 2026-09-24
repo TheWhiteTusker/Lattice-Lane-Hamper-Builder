@@ -8,6 +8,7 @@ import { ColorsCard } from "./colors-card";
 import { filterStages } from "./filter";
 import type { MasterCtx } from "./master-ui";
 import { StageCard } from "./stage-card";
+import { SyncRatesButton } from "./sync-rates-button";
 import { VarietyDialog } from "./variety-dialog";
 
 export function CostMasterView({
@@ -63,6 +64,8 @@ export function CostMasterView({
         aria-label="Search the rate and hierarchy master"
         className="input text-sm"
       />
+
+      <SyncRatesButton />
 
       <ColorsCard productColors={productColors} />
 

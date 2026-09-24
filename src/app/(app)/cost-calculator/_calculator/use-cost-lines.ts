@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { calculateLineCost } from "@/lib/costing.ts";
 import type { CostStageWithHierarchy, ProductCostLine } from "@/lib/types";
-import { BOUGHT_OUT, createEmptyLine, type LineState } from "./lines";
+import { BOUGHT_OUT, createEmptyLine, withMaster, type LineState } from "./lines";
 
 export type CostLines = ReturnType<typeof useCostLines>;
 
@@ -9,7 +9,8 @@ export type CostLines = ReturnType<typeof useCostLines>;
 export function useCostLines(stages: CostStageWithHierarchy[], initialLines?: ProductCostLine[]) {
   const [lines, setLines] = useState<LineState[]>(() =>
     initialLines?.length
-      ? initialLines.map((l) => ({ ...l, tempKey: crypto.randomUUID() }))
+      ? // Saved lines show the master's current names and rates (see withMaster).
+        initialLines.map((l) => withMaster({ ...l, tempKey: crypto.randomUUID() }, stages))
       : // One empty row per stage, ready to be filled from the dropdowns.
         stages.map((s) => createEmptyLine(s.code, s.categories)),
   );

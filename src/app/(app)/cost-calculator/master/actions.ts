@@ -110,17 +110,19 @@ export async function saveCostVariety(formData: FormData) {
     return { ok: true };
   }
 
-  // A new rate or unit reprices every product costed with this variety.
+  // A new rate or unit reprices every product costed with this variety; a
+  // new name is copied onto their lines too.
   const { data: before } = await supabase
     .from("cost_varieties")
-    .select("default_rate, unit")
+    .select("default_rate, unit, name")
     .eq("id", id)
-    .maybeSingle<{ default_rate: number; unit: string }>();
-  const repricing = !!before && (Number(before.default_rate) !== default_rate || before.unit !== unit);
+    .maybeSingle<{ default_rate: number; unit: string; name: string }>();
+  const repricing =
+    !!before && (Number(before.default_rate) !== default_rate || before.unit !== unit || before.name !== name);
   if (repricing) {
     const { profile } = await requireUser();
     if (!isAdmin(profile.role)) {
-      return { error: "Only an admin can change a rate or unit, because it reprices the products that use it." };
+      return { error: "Only an admin can change a variety's name, rate or unit, because it updates the products that use it." };
     }
   }
 
@@ -129,7 +131,7 @@ export async function saveCostVariety(formData: FormData) {
   refresh();
   if (!repricing) return { ok: true };
 
-  const res = await repriceVariety(supabase, id, default_rate, unit);
+  const res = await repriceVariety(supabase, id);
   revalidatePath("/products");
   revalidatePath("/products/[...code]", "page");
   if (res.error) {

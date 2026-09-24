@@ -36,9 +36,28 @@ async function productsOfSheet(supabase: SupabaseClient, sheet: ProductCostSheet
 export async function repriceVariety(
   supabase: SupabaseClient,
   varietyId: string,
-  rate: number,
-  unit: string,
 ): Promise<{ products: number; error?: string }> {
+  const { data: v } = await supabase
+    .from("cost_varieties")
+    .select("name, default_rate, unit, cost_subcategories(name, cost_categories(name))")
+    .eq("id", varietyId)
+    .maybeSingle<{
+      name: string;
+      default_rate: number;
+      unit: string;
+      cost_subcategories: { name: string; cost_categories: { name: string } | null } | null;
+    }>();
+  if (!v) return { products: 0, error: "That variety no longer exists." };
+  const rate = Number(v.default_rate);
+  const unit = v.unit;
+  const sub = v.cost_subcategories;
+  // Lines also take the master's current names, so renames show everywhere.
+  const names = {
+    ...(sub?.cost_categories ? { category_name: sub.cost_categories.name } : {}),
+    ...(sub ? { subcategory_name: sub.name, item_name: `${sub.name} ${v.name}` } : {}),
+    variety_name: v.name,
+  };
+
   const { data: used, error } = await supabase
     .from("product_cost_lines")
     .select("*")
@@ -53,7 +72,7 @@ export async function repriceVariety(
       const calc = calculateLineCost({ ...l, rate, unit });
       return supabase
         .from("product_cost_lines")
-        .update({ rate, unit, calculated_area: calc.calculated_area, line_total: calc.line_total })
+        .update({ ...names, rate, unit, calculated_area: calc.calculated_area, line_total: calc.line_total })
         .eq("id", l.id!);
     }),
   );

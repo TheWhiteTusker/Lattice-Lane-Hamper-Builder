@@ -22,15 +22,19 @@ function Pick({
   className?: string;
   onChange: (name: string) => void;
 }) {
+  // A saved choice that has since been removed from the master stays visible, flagged.
+  const missing = !!value && !options.some((o) => o.name === value);
   return (
     <td className="p-2">
       <select
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className={`select text-xs py-1 px-2 ${className}`}
+        className={`select text-xs py-1 px-2 ${missing ? "border-amber-400 text-amber-800" : ""} ${className}`}
+        title={missing ? "No longer in the Rates & Hierarchy Master: pick a current option" : undefined}
         disabled={disabled}
       >
         <option value="">{placeholder}</option>
+        {missing && <option value={value}>{value} (not in master)</option>}
         {options.map((o) => (
           <option key={o.id} value={o.name}>
             {o.name}

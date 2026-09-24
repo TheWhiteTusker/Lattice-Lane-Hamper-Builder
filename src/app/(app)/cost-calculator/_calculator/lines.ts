@@ -63,3 +63,31 @@ export const toSavedLine = (l: LineState): ProductCostLine => ({
   calculated_area: l.calculated_area,
   line_total: l.line_total,
 });
+
+/**
+ * A saved line brought up to its master variety: current names, rate and
+ * unit. Found by the variety's id, so a rename in the master still matches.
+ */
+export function withMaster(line: LineState, stages: CostStageWithHierarchy[]): LineState {
+  if (!line.cost_variety_id) return line;
+  for (const stage of stages) {
+    for (const cat of stage.categories) {
+      for (const sub of cat.subcategories) {
+        const v = sub.varieties.find((x) => x.id === line.cost_variety_id);
+        if (!v) continue;
+        const next: LineState = {
+          ...line,
+          category_name: cat.name,
+          subcategory_name: sub.name,
+          variety_name: v.name,
+          item_name: `${sub.name} ${v.name}`,
+          rate: Number(v.default_rate),
+          unit: v.unit,
+        };
+        const calc = calculateLineCost(next);
+        return { ...next, calculated_area: calc.calculated_area, line_total: calc.line_total };
+      }
+    }
+  }
+  return line;
+}
