@@ -51,6 +51,39 @@ export function CostMasterView({
   // Status/feedback
   const [feedback, setFeedback] = useState<{ error?: string; success?: string }>({});
 
+  // Collapsed by default; a search expands everything it matched.
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const [query, setQuery] = useState("");
+  const q = query.trim().toLowerCase();
+  const isOpen = (id: string) => q !== "" || expanded.has(id);
+  const toggle = (id: string) =>
+    setExpanded((s) => {
+      const next = new Set(s);
+      if (!next.delete(id)) next.add(id);
+      return next;
+    });
+  const expand = (id: string) => setExpanded((s) => new Set(s).add(id));
+
+  // A matching level keeps everything beneath it; otherwise keep only matching children.
+  const hit = (s: string | null | undefined) => (s ?? "").toLowerCase().includes(q);
+  const visibleStages = !q
+    ? stages
+    : stages.flatMap((stage) => {
+        if (hit(stage.name)) return [stage];
+        const categories = stage.categories.flatMap((cat) => {
+          if (hit(cat.name)) return [cat];
+          const subcategories = cat.subcategories.flatMap((sub) => {
+            if (hit(sub.name)) return [sub];
+            const varieties = sub.varieties.filter(
+              (v) => hit(v.name) || hit(v.notes) || hit(v.unit),
+            );
+            return varieties.length ? [{ ...sub, varieties }] : [];
+          });
+          return subcategories.length ? [{ ...cat, subcategories }] : [];
+        });
+        return categories.length ? [{ ...stage, categories }] : [];
+      });
+
   function handleAddColor() {
     if (!newColor.trim()) return;
     const trimmed = newColor.trim();
@@ -189,6 +222,15 @@ export function CostMasterView({
 
   return (
     <div className="space-y-6">
+      <input
+        type="search"
+        value={query}
+        onChange={(e) => setQuery(e.target.value)}
+        placeholder="Search types, categories, subcategories, varieties, notes…"
+        aria-label="Search the rate and hierarchy master"
+        className="input text-sm"
+      />
+
       {/* ---------------- PRODUCT COLORS MASTER CARD ---------------- */}
       <div className="card p-5">
         <div className="flex flex-wrap items-center justify-between gap-2">
@@ -303,35 +345,57 @@ export function CostMasterView({
       )}
 
       {/* ---------------- 4-LEVEL HIERARCHY ACCORDION ---------------- */}
-      {stages.map((stage) => {
+      {q && visibleStages.length === 0 && (
+        <p className="text-sm text-[var(--color-muted)] italic">
+          Nothing matches &ldquo;{query.trim()}&rdquo;.
+        </p>
+      )}
+      {visibleStages.map((stage) => {
         const isMachine = stage.code === "machine";
+        const stageOpen = isOpen(stage.id);
 
         return (
           <div key={stage.id} className="card p-5 space-y-4">
-            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--color-border)] pb-3">
-              <div>
+            <div
+              className={`flex flex-wrap items-center justify-between gap-3 ${stageOpen ? "border-b border-[var(--color-border)] pb-3" : ""}`}
+            >
+              <button
+                type="button"
+                onClick={() => toggle(stage.id)}
+                aria-expanded={stageOpen}
+                className="text-left"
+              >
                 <div className="flex items-center gap-2">
+                  <Chevron open={stageOpen} />
                   <span className="flex h-6 w-6 items-center justify-center rounded-full bg-[var(--color-brand)] text-xs font-bold text-white">
                     {stage.sort_order}
                   </span>
                   <h3 className="text-lg font-bold text-[var(--color-ink)]">
                     {stage.name} Master
                   </h3>
+                  <span className="badge text-[11px]">
+                    {stage.categories.length}{" "}
+                    {stage.categories.length === 1 ? "category" : "categories"}
+                  </span>
                 </div>
                 <p className="text-xs text-[var(--color-muted)] mt-0.5">
                   Hierarchy: Category &rarr; Subcategory (e.g. Birch) &rarr; Varieties (e.g. 3mm, 8mm, 12mm)
                 </p>
-              </div>
+              </button>
 
               <button
                 type="button"
-                onClick={() => setAddingCatStageId(stage.id)}
+                onClick={() => {
+                  setAddingCatStageId(stage.id);
+                  expand(stage.id);
+                }}
                 className="btn-secondary text-xs py-1.5 px-3"
               >
                 + Add Category to {stage.name}
               </button>
             </div>
 
+            {stageOpen && (<>
             {/* Inline add category box */}
             {addingCatStageId === stage.id && (
               <div className="rounded-lg border border-[var(--color-brand)] bg-emerald-50/50 p-3 flex flex-wrap items-center gap-3">
@@ -365,14 +429,24 @@ export function CostMasterView({
 
             {/* Categories list */}
             <div className="space-y-4">
-              {stage.categories.map((cat) => (
+              {stage.categories.map((cat) => {
+                const catOpen = isOpen(cat.id);
+                return (
                 <div
                   key={cat.id}
                   className="rounded-xl border border-[var(--color-border)] bg-slate-50/40 p-4 space-y-3"
                 >
                   {/* Category Header */}
-                  <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[var(--color-border)] pb-2">
-                    <div className="flex items-center gap-2">
+                  <div
+                    className={`flex flex-wrap items-center justify-between gap-2 ${catOpen ? "border-b border-[var(--color-border)] pb-2" : ""}`}
+                  >
+                    <button
+                      type="button"
+                      onClick={() => toggle(cat.id)}
+                      aria-expanded={catOpen}
+                      className="flex items-center gap-2 text-left"
+                    >
+                      <Chevron open={catOpen} />
                       <span className="font-bold text-sm text-[var(--color-ink)] uppercase tracking-wide">
                         {cat.name}
                       </span>
@@ -380,12 +454,15 @@ export function CostMasterView({
                         {cat.subcategories.length}{" "}
                         {cat.subcategories.length === 1 ? "subcategory" : "subcategories"}
                       </span>
-                    </div>
+                    </button>
 
                     <div className="flex items-center gap-2">
                       <button
                         type="button"
-                        onClick={() => setAddingSubCatId(cat.id)}
+                        onClick={() => {
+                          setAddingSubCatId(cat.id);
+                          expand(cat.id);
+                        }}
                         className="btn-secondary text-xs py-1 px-2.5"
                       >
                         + Add Subcategory
@@ -401,6 +478,7 @@ export function CostMasterView({
                     </div>
                   </div>
 
+                  {catOpen && (<>
                   {/* Inline add subcategory box */}
                   {addingSubCatId === cat.id && (
                     <div className="rounded-lg border border-[var(--color-brand)] bg-white p-3 flex flex-wrap items-center gap-3">
@@ -439,25 +517,36 @@ export function CostMasterView({
                     </p>
                   ) : (
                     <div className="space-y-3">
-                      {cat.subcategories.map((sub) => (
+                      {cat.subcategories.map((sub) => {
+                        const subOpen = isOpen(sub.id);
+                        return (
                         <div
                           key={sub.id}
                           className="rounded-lg border border-slate-200 bg-white p-3 shadow-xs"
                         >
-                          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-2 mb-2">
-                            <div className="flex items-center gap-2">
+                          <div
+                            className={`flex flex-wrap items-center justify-between gap-2 ${subOpen ? "border-b border-slate-100 pb-2 mb-2" : ""}`}
+                          >
+                            <button
+                              type="button"
+                              onClick={() => toggle(sub.id)}
+                              aria-expanded={subOpen}
+                              className="flex items-center gap-2 text-left"
+                            >
+                              <Chevron open={subOpen} />
                               <span className="font-semibold text-xs text-[var(--color-ink)]">
                                 Subcategory: <span className="text-[var(--color-brand-dark)] font-bold">{sub.name}</span>
                               </span>
                               <span className="text-[11px] text-[var(--color-muted)]">
                                 ({sub.varieties.length} {sub.varieties.length === 1 ? "variety" : "varieties"})
                               </span>
-                            </div>
+                            </button>
 
                             <div className="flex items-center gap-2">
                               <button
                                 type="button"
                                 onClick={() => {
+                                  expand(sub.id);
                                   setActiveSubcategoryId(sub.id);
                                   setEditingVariety({
                                     unit: isMachine ? "min" : "sq ft",
@@ -481,6 +570,7 @@ export function CostMasterView({
                           </div>
 
                           {/* Varieties Table under this subcategory */}
+                          {subOpen && (
                           <div className="overflow-x-auto">
                             <table className="w-full text-left text-xs">
                               <thead>
@@ -545,13 +635,18 @@ export function CostMasterView({
                               </tbody>
                             </table>
                           </div>
+                          )}
                         </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   )}
+                  </>)}
                 </div>
-              ))}
+                );
+              })}
             </div>
+            </>)}
           </div>
         );
       })}
@@ -685,5 +780,16 @@ export function CostMasterView({
         </div>
       )}
     </div>
+  );
+}
+
+function Chevron({ open }: { open: boolean }) {
+  return (
+    <span
+      aria-hidden
+      className={`inline-block text-[10px] text-[var(--color-muted)] transition-transform ${open ? "rotate-90" : ""}`}
+    >
+      ▶
+    </span>
   );
 }
