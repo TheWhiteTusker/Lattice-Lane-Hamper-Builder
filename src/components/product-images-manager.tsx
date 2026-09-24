@@ -26,6 +26,8 @@ type Props = {
   colors: ProductColor[];
   /** Told about every upload, delete or re-tag, so a parent can mirror the list. */
   onImagesChange?: (images: ProductImage[]) => void;
+  /** False where photos are uploaded elsewhere (the calculator's colour rows); the gallery then only manages them. */
+  canUpload?: boolean;
 };
 
 export function ProductImagesManager(props: Props) {
@@ -39,6 +41,7 @@ function Manager({
   currentColor,
   colors,
   onImagesChange,
+  canUpload = true,
 }: Props & { productId: string }) {
   const act = useImageActions(productId, initialImages, onImagesChange);
   const { images, feedback } = act;
@@ -63,16 +66,20 @@ function Manager({
         <div>
           <h3 className="text-sm font-bold text-[var(--color-ink)]">Product Images & Color Variations</h3>
           <p className="text-xs text-[var(--color-muted)] mt-0.5">
-            Pick a color tab, then upload its photos. Multiple images supported per color.
+            {canUpload
+              ? "Pick a color tab, then upload its photos. Multiple images supported per color."
+              : "Set the cover, change a photo's color or remove it. Add photos in the color rows above."}
           </p>
         </div>
-        <button
-          type="button"
-          onClick={() => setShowUrlInput(!showUrlInput)}
-          className="text-xs text-[var(--color-brand)] hover:underline font-medium"
-        >
-          {showUrlInput ? "Hide URL Option" : "+ Add via URL"}
-        </button>
+        {canUpload && (
+          <button
+            type="button"
+            onClick={() => setShowUrlInput(!showUrlInput)}
+            className="text-xs text-[var(--color-brand)] hover:underline font-medium"
+          >
+            {showUrlInput ? "Hide URL Option" : "+ Add via URL"}
+          </button>
+        )}
       </div>
 
       {/* Filter Tabs */}
@@ -101,25 +108,29 @@ function Manager({
         )}
       </div>
 
-      <UploadBar
-        colors={colors}
-        uploadColor={uploadColor}
-        onUploadColor={setUploadColor}
-        isPrimary={isPrimaryUpload}
-        onPrimary={setIsPrimaryUpload}
-        showUrl={showUrlInput}
-        isPending={act.isPending}
-        onFiles={(files) => act.upload(files, uploadColor, isPrimaryUpload)}
-        onUrl={(url, done) =>
-          act.addUrl(url, uploadColor, isPrimaryUpload, () => {
-            done();
-            setShowUrlInput(false);
-          })
-        }
-      />
+      {canUpload && (
+        <UploadBar
+          colors={colors}
+          uploadColor={uploadColor}
+          onUploadColor={setUploadColor}
+          isPrimary={isPrimaryUpload}
+          onPrimary={setIsPrimaryUpload}
+          showUrl={showUrlInput}
+          isPending={act.isPending}
+          onFiles={(files) => act.upload(files, uploadColor, isPrimaryUpload)}
+          onUrl={(url, done) =>
+            act.addUrl(url, uploadColor, isPrimaryUpload, () => {
+              done();
+              setShowUrlInput(false);
+            })
+          }
+        />
+      )}
 
       {feedback.error && (
-        <div className="rounded-lg bg-red-50 p-2.5 text-xs font-medium text-red-700 border border-red-200">{feedback.error}</div>
+        <div className="rounded-lg bg-red-50 p-2.5 text-xs font-medium text-red-700 border border-red-200">
+          {feedback.error}
+        </div>
       )}
       {feedback.success && (
         <div className="rounded-lg bg-emerald-50 p-2.5 text-xs font-medium text-emerald-800 border border-emerald-200">

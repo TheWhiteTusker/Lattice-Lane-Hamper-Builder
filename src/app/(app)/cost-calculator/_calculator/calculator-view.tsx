@@ -83,6 +83,7 @@ export function CostCalculatorView({
             // Every colour's photos, including those saved on sibling colour products
             initialImages={photos.images}
             onImagesChange={photos.handleGalleryChange}
+            canUpload={false}
             productName={details.name}
             currentColor={selectedColors[0]}
             colors={
