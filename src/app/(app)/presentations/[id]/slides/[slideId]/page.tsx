@@ -3,7 +3,7 @@ import { requireUser } from "@/lib/supabase/server";
 import { parseCanvas } from "@/lib/hamper-canvas";
 import { CanvasEditor } from "@/components/studio/canvas-editor";
 import { loadCatalog } from "@/app/(app)/hampers/data";
-import { saveSlide, uploadPresentationAsset } from "../../../actions";
+import { saveSlide, uploadPresentationAsset } from "../../../slide-actions";
 
 export default async function SlideEditorPage({ params }: { params: Promise<{ id: string; slideId: string }> }) {
   const { id, slideId } = await params;

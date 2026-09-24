@@ -73,10 +73,10 @@ export async function lookupGstin(
   const value = gstin.trim().toUpperCase();
   if (!GSTIN.test(value)) return { error: "Enter a valid 15-character GSTIN first." };
 
-  let key = process.env.GSTIN_API_KEY;
+  let key = process.env.GSTIN_API_KEY?.trim() || undefined;
   try {
     const { env } = await getCloudflareContext({ async: true });
-    key ??= (env as unknown as { GSTIN_API_KEY?: string }).GSTIN_API_KEY;
+    key ??= (env as unknown as { GSTIN_API_KEY?: string })?.GSTIN_API_KEY?.trim() || undefined;
   } catch {
     // Not on Cloudflare
   }

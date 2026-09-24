@@ -3,7 +3,6 @@
 import { useActionState, useState } from "react";
 import Link from "next/link";
 import { saveProduct, deleteProduct } from "./actions";
-import { round2 } from "@/lib/pricing";
 import {
   formatProductCode,
   parseProductCode,
@@ -12,10 +11,13 @@ import {
   resolveColors,
   deriveCategoryCode,
   type ProductColor,
-  codesForColors,
 } from "@/lib/product-code";
 import { ProductImagesManager } from "@/components/product-images-manager";
 import type { Category, Product, ProductImage } from "@/lib/types";
+import { costingHref } from "../cost-calculator/href";
+import { CodeField } from "./_form/code-field";
+import { ColorPicker, SourceField } from "./_form/color-picker";
+import { PriceFields } from "./_form/price-fields";
 
 export function ProductForm({
   product,
@@ -35,62 +37,29 @@ export function ProductForm({
 
   const [code, setCode] = useState(product?.code ?? "");
   const [categoryId, setCategoryId] = useState(product?.category_id ?? "");
-  const [costPrice, setCostPrice] = useState(String(product?.cost_price ?? ""));
-  const [markup, setMarkup] = useState(
-    product?.markup_pct != null
-      ? String(product.markup_pct)
-      : product && product.cost_price > 0 && product.default_sp > 0
-        ? String(round2(((product.default_sp - product.cost_price) / product.cost_price) * 100))
-        : "100",
-  );
-  const [sellingPrice, setSellingPrice] = useState(String(product?.default_sp ?? ""));
   const [source, setSource] = useState(product?.source ?? "");
   const [selectedColors, setSelectedColors] = useState<string[]>(
     product?.colors && product.colors.length > 0 ? product.colors : ["Walnut"],
   );
 
-  const parsedCode = parseProductCode(code);
-
-  function applyMarkup(val?: string) {
-    const cp = Number(costPrice);
-    const m = Number(val ?? markup);
-    if (!Number.isFinite(cp) || !Number.isFinite(m)) return;
-    setSellingPrice(String(round2(cp * (1 + m / 100))));
-  }
-
-  function handleSpChange(val: string) {
-    setSellingPrice(val);
-    const sp = Number(val);
-    const cp = Number(costPrice);
-    if (Number.isFinite(sp) && Number.isFinite(cp) && cp > 0 && sp > 0) {
-      setMarkup(String(round2(((sp - cp) / cp) * 100)));
-    }
-  }
-
-  function toggleColor(col: string) {
-    setSelectedColors((prev) =>
-      prev.includes(col) ? prev.filter((c) => c !== col) : [...prev, col],
-    );
-  }
+  const categoryCode = (catId: string) => {
+    const cat = categories.find((c) => c.id === catId);
+    return cat?.code || (cat ? deriveCategoryCode(cat.name) : "LC");
+  };
 
   function handleCategoryChange(newCatId: string) {
     setCategoryId(newCatId);
-    const cat = categories.find((c) => c.id === newCatId);
-    const catCode = cat?.code || (cat ? deriveCategoryCode(cat.name) : "LC");
-    const currentParsed = parseProductCode(code);
-    const colCode =
-      currentParsed.colorCode ||
-      (selectedColors[0] ? colorCode(selectedColors[0]) : "WL");
-    setCode(formatProductCode(catCode, currentParsed.serial || "0001", colCode));
+    const parsed = parseProductCode(code);
+    const colCode = parsed.colorCode || (selectedColors[0] ? colorCode(selectedColors[0]) : "WL");
+    setCode(formatProductCode(categoryCode(newCatId), parsed.serial || "0001", colCode));
   }
 
   function handleColorSelect(colName: string) {
-    toggleColor(colName);
-    const colCode = colorCode(colName);
-    const currentParsed = parseProductCode(code);
+    setSelectedColors((prev) => (prev.includes(colName) ? prev.filter((c) => c !== colName) : [...prev, colName]));
+    const parsed = parseProductCode(code);
     const cat = categories.find((c) => c.id === categoryId);
-    const catCode = cat?.code || currentParsed.categoryCode || "LC";
-    setCode(formatProductCode(catCode, currentParsed.serial || "0001", colCode));
+    const catCode = cat?.code || parsed.categoryCode || "LC";
+    setCode(formatProductCode(catCode, parsed.serial || "0001", colorCode(colName)));
   }
 
   return (
@@ -105,10 +74,7 @@ export function ProductForm({
               Break down this product into Material, Hardware, Finishing & Machine per-minute costs.
             </p>
           </div>
-          <Link
-            href={`/cost-calculator?product=${encodeURIComponent(product.code)}`}
-            className="btn-primary text-xs py-1.5 px-3"
-          >
+          <Link href={costingHref(product.code)} className="btn-primary text-xs py-1.5 px-3">
             Open in Cost Calculator &rarr;
           </Link>
         </div>
@@ -121,45 +87,15 @@ export function ProductForm({
         ))}
 
         <div className="grid gap-4 sm:grid-cols-2">
-          <div>
-            <div className="flex items-center justify-between">
-              <label className="label" htmlFor="code">
-                Product code *
-              </label>
-              <button
-                type="button"
-                onClick={() => {
-                  const cat = categories.find((c) => c.id === categoryId);
-                  const catCode = cat?.code || (cat ? deriveCategoryCode(cat.name) : "LC");
-                  const col = selectedColors[0] || "Walnut";
-                  setCode(formatProductCode(catCode, parsedCode.serial || "0001", col));
-                }}
-                className="text-[11px] text-[var(--color-brand)] hover:underline"
-              >
-                Auto-format
-              </button>
-            </div>
-            <input
-              id="code"
-              name="code"
-              required
-              value={code}
-              onChange={(e) => setCode(e.target.value.toUpperCase())}
-              placeholder="e.g. LC/0001/WL"
-              className="input mt-1 font-mono uppercase"
-            />
-            <div className="mt-1 flex items-center justify-between text-xs">
-              <span
-                className={
-                  parsedCode.isValid ? "text-emerald-700 font-medium" : "text-amber-700"
-                }
-              >
-                {parsedCode.isValid
-                  ? `✓ Valid: ${parsedCode.categoryCode}/${parsedCode.serial}/${parsedCode.colorCode} (${parsedCode.colorName})`
-                  : `Format: [CAT]/[0001]/[COLOR] (e.g. LC/0001/WL)`}
-              </span>
-            </div>
-          </div>
+          <CodeField
+            code={code}
+            onChange={setCode}
+            onAutoFormat={() =>
+              setCode(
+                formatProductCode(categoryCode(categoryId), parseProductCode(code).serial || "0001", selectedColors[0] || "Walnut"),
+              )
+            }
+          />
 
           <div>
             <label className="label" htmlFor="category_id">
@@ -175,7 +111,8 @@ export function ProductForm({
               <option value="">No category</option>
               {categories.map((c) => (
                 <option key={c.id} value={c.id}>
-                  {c.code ? `[${c.code}] ` : ""}{c.name}
+                  {c.code ? `[${c.code}] ` : ""}
+                  {c.name}
                   {c.counts_as_item ? "" : " (not counted as an item)"}
                 </option>
               ))}
@@ -186,143 +123,12 @@ export function ProductForm({
             <label className="label" htmlFor="name">
               Product name
             </label>
-            <input
-              id="name"
-              name="name"
-              required
-              defaultValue={product?.name}
-              className="input mt-1"
-            />
+            <input id="name" name="name" required defaultValue={product?.name} className="input mt-1" />
           </div>
 
-          <div className="sm:col-span-2">
-            <label className="label" htmlFor="source">
-              Source / vendor
-            </label>
-            <input
-              id="source"
-              name="source"
-              value={source}
-              onChange={(e) => setSource(e.target.value)}
-              className="input mt-1"
-            />
-            <div className="mt-1.5 flex flex-wrap gap-1.5">
-              {sources.map((s) => (
-                <button
-                  key={s}
-                  type="button"
-                  onClick={() => setSource(s)}
-                  className={`rounded-full px-2.5 py-0.5 text-xs font-medium transition-all ${
-                    source === s
-                      ? "bg-[var(--color-brand)] text-white shadow-sm"
-                      : "bg-[var(--color-sheet)] text-[var(--color-muted)] hover:bg-slate-200"
-                  }`}
-                >
-                  {s}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Color Selection */}
-          <div className="sm:col-span-2">
-            <div className="flex items-center justify-between">
-              <label className="label">Available Colors / Finishes</label>
-              <span className="text-xs text-[var(--color-muted)]">
-                Manage the list in Cost Calculator → Rates & Hierarchy Master
-              </span>
-            </div>
-            <div className="mt-1.5 flex flex-wrap gap-2">
-              {allColors.map((col) => {
-                const checked = selectedColors.includes(col.name);
-                return (
-                  <button
-                    key={col.name}
-                    type="button"
-                    onClick={() => handleColorSelect(col.name)}
-                    className={`flex items-center gap-2 rounded-full px-3 py-1 text-xs font-medium transition-all ${
-                      checked
-                        ? "bg-[var(--color-brand)] text-white shadow-sm"
-                        : "bg-[var(--color-sheet)] text-[var(--color-muted)] hover:bg-slate-200"
-                    }`}
-                  >
-                    <span
-                      className="inline-block h-2.5 w-2.5 rounded-full border border-black/20 bg-slate-300"
-                      style={{ backgroundColor: col.hex }}
-                    />
-                    <span>
-                      {col.name} ({col.code})
-                    </span>
-                    {checked && <span>✓</span>}
-                  </button>
-                );
-              })}
-            </div>
-            {!product && selectedColors.length > 1 && (
-              <p className="mt-1.5 text-xs text-[var(--color-muted)]">
-                Creates {selectedColors.length} products:{" "}
-                <span className="font-mono">
-                  {codesForColors(code, selectedColors)
-                    .map((c) => c.code)
-                    .join(", ")}
-                </span>
-              </p>
-            )}
-          </div>
-
-          {/* Cost Price */}
-          <div>
-            <label className="label" htmlFor="cost_price">
-              Cost price (₹)
-            </label>
-            <input
-              id="cost_price"
-              name="cost_price"
-              inputMode="decimal"
-              value={costPrice}
-              onChange={(e) => setCostPrice(e.target.value)}
-              className="input input-num mt-1 font-mono"
-            />
-          </div>
-
-          {/* Markup % */}
-          <div>
-            <label className="label" htmlFor="markup_pct">
-              Markup %
-            </label>
-            <div className="mt-1 flex gap-2">
-              <input
-                id="markup_pct"
-                name="markup_pct"
-                inputMode="decimal"
-                value={markup}
-                onChange={(e) => setMarkup(e.target.value)}
-                className="input input-num font-mono"
-              />
-              <button
-                type="button"
-                onClick={() => applyMarkup()}
-                className="btn-secondary whitespace-nowrap"
-              >
-                Apply
-              </button>
-            </div>
-          </div>
-
-          {/* Selling Price */}
-          <div>
-            <label className="label" htmlFor="default_sp">
-              Selling price (₹)
-            </label>
-            <input
-              id="default_sp"
-              name="default_sp"
-              inputMode="decimal"
-              value={sellingPrice}
-              onChange={(e) => handleSpChange(e.target.value)}
-              className="input input-num mt-1 font-mono font-bold text-[var(--color-ink)]"
-            />
-          </div>
+          <SourceField value={source} onChange={setSource} sources={sources} />
+          <ColorPicker allColors={allColors} selected={selectedColors} code={code} isNew={!product} onToggle={handleColorSelect} />
+          <PriceFields product={product} />
 
           <label className="sm:col-span-2 flex items-center gap-2 py-1 text-sm cursor-pointer">
             <input
@@ -357,18 +163,13 @@ export function ProductForm({
         </div>
       </form>
 
-      {/* Product Images & Color Finishes Gallery */}
       <div className="card max-w-2xl p-5 mt-4">
         <ProductImagesManager
           productId={product?.id}
           initialImages={initialImages}
           productName={product?.name}
           currentColor={selectedColors[0]}
-          colors={
-            selectedColors.length
-              ? allColors.filter((c) => selectedColors.includes(c.name))
-              : allColors
-          }
+          colors={selectedColors.length ? allColors.filter((c) => selectedColors.includes(c.name)) : allColors}
         />
       </div>
 

@@ -3,7 +3,8 @@
 import { useState, useTransition } from "react";
 import Link from "next/link";
 import { DEFAULT_NOTE } from "@/lib/presentation";
-import { createPresentation, type DeckItem } from "../actions";
+import { createPresentation } from "../deck-actions";
+import type { DeckItem } from "../deck-schemas";
 import { buildSlides } from "../build-slides";
 import { ItemPicker, type PickerData } from "../item-picker";
 

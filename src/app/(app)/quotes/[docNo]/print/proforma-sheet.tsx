@@ -1,12 +1,12 @@
 import Image from "next/image";
-import { amountInWords, formatMoney, priceQuote, round2, COMBINED_ORDER } from "@/lib/pricing";
+import { amountInWords, formatMoney, priceQuote, COMBINED_ORDER } from "@/lib/pricing";
 import { HamperContents } from "@/components/hamper-contents";
 import type { CompanySettings, HamperItem, QuoteItem, QuoteSummary } from "@/lib/types";
+import { ProformaTotals, line } from "./proforma-totals";
 
 /** Blank rows under the items, so a short invoice still reads as the ruled sheet. */
 const MIN_ROWS = 8;
 
-const line = "border-neutral-400";
 const cell = `border-b border-r ${line} px-2 py-1 last:border-r-0`;
 
 /**
@@ -42,16 +42,7 @@ export function ProformaSheet({
       gstRate: quote.gst_rate,
     },
   );
-  const taxable = totals.taxableValue ?? 0;
-  const gst = totals.gstAmount ?? 0;
   const grand = totals.grandTotal ?? 0;
-
-  // GSTIN starts with the state code: same state splits into CGST + SGST,
-  // a different state is IGST. No client GSTIN is treated as same state.
-  const interState =
-    !!quote.gstin && !!company.gstin && quote.gstin.slice(0, 2) !== company.gstin.slice(0, 2);
-  const pct = (rate: number) => `${round2(rate * 100)}%`;
-  const hasAdjustments = quote.order_discount > 0 || quote.adj1 > 0 || quote.adj2 > 0;
 
   const date = quote.doc_date.split("-").reverse().join("/");
 
@@ -139,23 +130,7 @@ export function ProformaSheet({
           </tbody>
         </table>
 
-        {/* ---------------- totals ---------------- */}
-        <TotalLine label="Sub Total" value={formatMoney(totals.subtotal)} />
-        {quote.order_discount > 0 && (
-          <TotalLine label="Discount" value={`− ${formatMoney(quote.order_discount)}`} />
-        )}
-        {quote.adj1 > 0 && <TotalLine label="Packaging / Freight" value={formatMoney(quote.adj1)} />}
-        {quote.adj2 > 0 && <TotalLine label="Other Charges" value={formatMoney(quote.adj2)} />}
-        {hasAdjustments && <TotalLine label="Taxable Value" value={formatMoney(taxable)} />}
-        {interState ? (
-          <TotalLine label={`IGST@${pct(quote.gst_rate)}`} value={formatMoney(gst)} />
-        ) : (
-          <>
-            <TotalLine label={`CGST@${pct(quote.gst_rate / 2)}`} value={formatMoney(gst / 2)} />
-            <TotalLine label={`SGST@${pct(quote.gst_rate / 2)}`} value={formatMoney(gst / 2)} />
-          </>
-        )}
-        <TotalLine label="Grand Total" value={formatMoney(grand)} strong />
+        <ProformaTotals quote={quote} company={company} totals={totals} />
 
         <div className={`flex border-b ${line}`}>
           <div className={`w-24 shrink-0 border-r ${line} px-2 py-1 uppercase`}>In Words</div>
@@ -195,16 +170,5 @@ export function ProformaSheet({
         </p>
       </div>
     </article>
-  );
-}
-
-function TotalLine({ label, value, strong }: { label: string; value: string; strong?: boolean }) {
-  return (
-    <div
-      className={`flex border-b ${line} ${strong ? "bg-neutral-300 text-lg font-bold" : "text-sm"}`}
-    >
-      <div className={`flex-1 border-r ${line} px-2 py-1 text-right uppercase`}>{label}</div>
-      <div className="w-32 px-2 py-1 text-right tabular-nums">{value}</div>
-    </div>
   );
 }

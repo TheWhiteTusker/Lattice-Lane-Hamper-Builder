@@ -3,14 +3,9 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { describeError } from "@/lib/forms";
-import { CODE_TO_COLOR, colorCode as toColorCode } from "@/lib/product-code";
+import { colorTag } from "@/lib/product-code";
 import type { ProductImage } from "@/lib/types";
-
-export type ImageActionResult = {
-  ok?: boolean;
-  error?: string;
-  image?: ProductImage;
-};
+import type { ImageActionResult } from "./image-types";
 
 /**
  * Upload an image file for a product to the product-images Supabase storage bucket
@@ -36,10 +31,6 @@ export async function uploadProductImage(formData: FormData): Promise<ImageActio
     if (!productId) {
       return { error: "Product ID is missing." };
     }
-
-    // Determine color & code
-    const colorCode = rawColor ? toColorCode(rawColor) : null;
-    const colorName = colorCode ? (CODE_TO_COLOR as Record<string, string>)[colorCode] || rawColor : rawColor;
 
     // Generate safe storage path
     const ext = file.name.split(".").pop()?.toLowerCase() || "jpg";
@@ -92,8 +83,7 @@ export async function uploadProductImage(formData: FormData): Promise<ImageActio
         product_id: productId,
         url: publicUrl,
         storage_path: storagePath,
-        color: colorName,
-        color_code: colorCode,
+        ...colorTag(rawColor),
         is_primary: isPrimary,
         caption,
       })
@@ -113,7 +103,7 @@ export async function uploadProductImage(formData: FormData): Promise<ImageActio
 
     revalidatePath("/products");
     revalidatePath("/hampers");
-    revalidatePath("/cost-calculator");
+    revalidatePath("/cost-calculator", "layout");
 
     return { ok: true, image: inserted };
   } catch (err: unknown) {
@@ -137,9 +127,6 @@ export async function addExternalProductImage(
     if (!cleanUrl) return { error: "Image URL is required." };
     if (!productId) return { error: "Product ID is missing." };
 
-    const colorCode = color ? toColorCode(color) : null;
-    const colorName = colorCode ? (CODE_TO_COLOR as Record<string, string>)[colorCode] || color : color;
-
     if (isPrimary) {
       await supabase
         .from("product_images")
@@ -153,8 +140,7 @@ export async function addExternalProductImage(
         product_id: productId,
         url: cleanUrl,
         storage_path: null,
-        color: colorName,
-        color_code: colorCode,
+        ...colorTag(color),
         is_primary: isPrimary,
         caption: caption || null,
       })
@@ -173,147 +159,6 @@ export async function addExternalProductImage(
     revalidatePath("/products");
     revalidatePath("/hampers");
     return { ok: true, image: inserted };
-  } catch (err: unknown) {
-    return { error: describeError(err) };
-  }
-}
-
-/**
- * Set an image as the primary cover thumbnail for a product
- */
-export async function setPrimaryProductImage(
-  imageId: string,
-  productId: string,
-): Promise<ImageActionResult> {
-  try {
-    const supabase = await createClient();
-
-    // 1. Clear existing primary
-    await supabase
-      .from("product_images")
-      .update({ is_primary: false })
-      .eq("product_id", productId);
-
-    // 2. Set this image as primary
-    const { data: updated, error } = await supabase
-      .from("product_images")
-      .update({ is_primary: true })
-      .eq("id", imageId)
-      .select("*")
-      .single<ProductImage>();
-
-    if (error) return { error: describeError(error) };
-
-    // 3. Update products.image_url
-    if (updated?.url) {
-      await supabase
-        .from("products")
-        .update({ image_url: updated.url })
-        .eq("id", productId);
-    }
-
-    revalidatePath("/products");
-    revalidatePath("/hampers");
-    return { ok: true, image: updated };
-  } catch (err: unknown) {
-    return { error: describeError(err) };
-  }
-}
-
-/**
- * Update the color finish tag of an image
- */
-export async function updateProductImageColor(
-  imageId: string,
-  rawColor: string | null,
-): Promise<ImageActionResult> {
-  try {
-    const supabase = await createClient();
-    const colorCode = rawColor ? toColorCode(rawColor) : null;
-    const colorName = colorCode ? (CODE_TO_COLOR as Record<string, string>)[colorCode] || rawColor : rawColor;
-
-    const { data: updated, error } = await supabase
-      .from("product_images")
-      .update({
-        color: colorName || null,
-        color_code: colorCode || null,
-      })
-      .eq("id", imageId)
-      .select("*")
-      .single<ProductImage>();
-
-    if (error) return { error: describeError(error) };
-
-    revalidatePath("/products");
-    return { ok: true, image: updated };
-  } catch (err: unknown) {
-    return { error: describeError(err) };
-  }
-}
-
-/**
- * Delete a product image from database and Supabase storage
- */
-export async function deleteProductImage(
-  imageId: string,
-  productId: string,
-): Promise<ImageActionResult> {
-  try {
-    const supabase = await createClient();
-
-    // Fetch image details
-    const { data: img } = await supabase
-      .from("product_images")
-      .select("*")
-      .eq("id", imageId)
-      .maybeSingle<ProductImage>();
-
-    if (!img) return { error: "Image not found." };
-
-    // Delete from storage if uploaded to Supabase
-    if (img.storage_path) {
-      await supabase.storage.from("product-images").remove([img.storage_path]);
-    }
-
-    // Delete row
-    const { error: delError } = await supabase
-      .from("product_images")
-      .delete()
-      .eq("id", imageId);
-
-    if (delError) return { error: describeError(delError) };
-
-    // If this was primary, update products.image_url to next available or null
-    if (img.is_primary) {
-      const { data: nextImg } = await supabase
-        .from("product_images")
-        .select("*")
-        .eq("product_id", productId)
-        .order("sort_order")
-        .order("created_at")
-        .limit(1)
-        .maybeSingle<ProductImage>();
-
-      if (nextImg) {
-        await supabase
-          .from("product_images")
-          .update({ is_primary: true })
-          .eq("id", nextImg.id);
-        await supabase
-          .from("products")
-          .update({ image_url: nextImg.url })
-          .eq("id", productId);
-      } else {
-        await supabase
-          .from("products")
-          .update({ image_url: null })
-          .eq("id", productId);
-      }
-    }
-
-    revalidatePath("/products");
-    revalidatePath("/hampers");
-    return { ok: true };
   } catch (err: unknown) {
     return { error: describeError(err) };
   }

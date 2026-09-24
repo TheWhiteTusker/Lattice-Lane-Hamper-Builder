@@ -3,44 +3,15 @@
 import { useEffect, useState, useTransition } from "react";
 import Link from "next/link";
 import { PageHeader } from "@/components/ui";
-import { SlideThumb } from "@/components/studio/slide-thumb";
 import { exportPptx } from "@/components/studio/export-pptx";
-import { layerLabel } from "@/lib/hamper-canvas";
-import { blankSlide, DEFAULT_NOTE } from "@/lib/presentation";
-import { buildSlides } from "../build-slides";
-import { deletePresentation, saveDeck, type DeckItem, type DeckSlideInput, type SlideInput } from "../actions";
-import { ItemPicker, type PickerData } from "../item-picker";
+import { blankSlide } from "@/lib/presentation";
+import { deletePresentation, saveDeck } from "../deck-actions";
+import type { DeckSlideInput } from "../deck-schemas";
+import type { PickerData } from "../item-picker";
 import type { SlideSummary } from "./page";
-
-const KIND_LABEL: Record<string, string> = {
-  cover: "Entry slide",
-  hamper: "Hamper",
-  product: "Product",
-  closing: "Ending slide",
-  blank: "Blank",
-};
-
-/** A slide on the page: saved ones have a database id; ones added since the last save carry their full row. */
-type DraftSlide = SlideSummary & { unsaved?: SlideInput };
-
-function slideName(s: SlideSummary) {
-  const t = s.canvas.layers.find((l) => l.kind === "text" && l.name === "Title");
-  return t ? layerLabel(t) : KIND_LABEL[s.kind] ?? "Slide";
-}
-
-/** New slides go before a trailing ending slide. */
-function insertBeforeClosing(slides: DraftSlide[], added: DraftSlide[]) {
-  return slides.at(-1)?.kind === "closing"
-    ? [...slides.slice(0, -1), ...added, slides.at(-1)!]
-    : [...slides, ...added];
-}
-
-const draftOf = (input: SlideInput): DraftSlide => ({
-  id: `new-${crypto.randomUUID()}`,
-  kind: input.kind,
-  canvas: input.canvas as SlideSummary["canvas"],
-  unsaved: input,
-});
+import { AddSlides } from "./add-slides";
+import { draftOf, insertBeforeClosing, type DraftSlide } from "./draft";
+import { SlideCard } from "./slide-card";
 
 export function DeckOverview({
   deck,
@@ -57,9 +28,6 @@ export function DeckOverview({
   const [saved, setSaved] = useState({ title: deck.title, ids: initialSlides.map((s) => s.id).join() });
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
-  const [adding, setAdding] = useState(false);
-  const [toAdd, setToAdd] = useState<DeckItem[]>([]);
-  const [layingOut, setLayingOut] = useState(false);
   const [exporting, setExporting] = useState<string | null>(null);
   const [saving, startSaving] = useTransition();
   const [deleting, startDelete] = useTransition();
@@ -94,21 +62,6 @@ export function DeckOverview({
   const addBlank = () =>
     edit((list) => insertBeforeClosing(list, [draftOf({ kind: "blank", hamper_id: null, product_id: null, canvas: blankSlide() })]));
 
-  async function addItems() {
-    setError(null);
-    setLayingOut(true);
-    try {
-      // Laying out reads hamper details and photo sizes; the slides still only join the draft.
-      const built = await buildSlides(toAdd, DEFAULT_NOTE);
-      edit((list) => insertBeforeClosing(list, built.map(draftOf)));
-      setToAdd([]);
-      setAdding(false);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Could not lay out the new slides.");
-    } finally {
-      setLayingOut(false);
-    }
-  }
 
   const save = () =>
     startSaving(async () => {
@@ -220,68 +173,25 @@ export function DeckOverview({
 
       <div className="grid grid-cols-[repeat(auto-fill,minmax(260px,1fr))] gap-4">
         {slides.map((s, i) => (
-          <div key={s.id} className={`card overflow-hidden ${s.unsaved ? "ring-2 ring-[var(--color-gold)]" : ""}`}>
-            {s.unsaved ? (
-              <div className="relative bg-[var(--color-paper)] p-2" title="Save changes to edit this slide">
-                <SlideThumb canvas={s.canvas} width={240} className="mx-auto rounded shadow-sm" />
-                <span className="absolute right-3 top-3 rounded bg-[var(--color-ink)] px-1.5 py-0.5 text-[11px] text-white">New · save to edit</span>
-              </div>
-            ) : (
-              <Link
-                href={`/presentations/${deck.id}/slides/${s.id}`}
-                prefetch={false}
-                onClick={guard}
-                className="block bg-[var(--color-paper)] p-2 hover:opacity-90"
-              >
-                <SlideThumb canvas={s.canvas} width={240} className="mx-auto rounded shadow-sm" />
-              </Link>
-            )}
-            <div className="flex items-center gap-2 px-3 py-2">
-              <span className="w-6 text-sm tabular-nums text-[var(--color-muted)]">{i + 1}</span>
-              <div className="min-w-0 flex-1">
-                <div className="truncate text-sm font-medium">{slideName(s)}</div>
-                <div className="text-xs text-[var(--color-muted)]">{KIND_LABEL[s.kind] ?? s.kind}</div>
-              </div>
-              <button type="button" aria-label="Move earlier" className="px-1 disabled:opacity-30" disabled={i === 0} onClick={() => move(s.id, -1)}>
-                ←
-              </button>
-              <button
-                type="button"
-                aria-label="Move later"
-                className="px-1 disabled:opacity-30"
-                disabled={i === slides.length - 1}
-                onClick={() => move(s.id, 1)}
-              >
-                →
-              </button>
-              <button type="button" aria-label="Remove slide" className="px-1 text-red-700" onClick={() => remove(s.id)}>
-                ×
-              </button>
-            </div>
-          </div>
+          <SlideCard
+            key={s.id}
+            s={s}
+            i={i}
+            last={i === slides.length - 1}
+            deckId={deck.id}
+            guard={guard}
+            onMove={(by) => move(s.id, by)}
+            onRemove={() => remove(s.id)}
+          />
         ))}
       </div>
 
-      <section className="mt-6 space-y-3">
-        <div className="flex flex-wrap items-center gap-2">
-          <button type="button" className="btn-secondary" onClick={() => setAdding((v) => !v)}>
-            {adding ? "Close" : "Add hamper or product slides"}
-          </button>
-          <button type="button" className="btn-secondary" onClick={addBlank}>
-            Add blank slide
-          </button>
-        </div>
-
-        {adding && (
-          <>
-            <ItemPicker {...picker} value={toAdd} onChange={setToAdd} />
-            <button type="button" className="btn-primary" disabled={layingOut || !toAdd.length} onClick={addItems}>
-              {layingOut ? "Laying out slides…" : `Add ${toAdd.length} slide${toAdd.length === 1 ? "" : "s"}`}
-            </button>
-            <p className="text-xs text-[var(--color-muted)]">New slides go before the ending slide. They are saved when you click Save changes.</p>
-          </>
-        )}
-      </section>
+      <AddSlides
+        picker={picker}
+        onAdd={(built) => edit((list) => insertBeforeClosing(list, built.map(draftOf)))}
+        onBlank={addBlank}
+        onError={setError}
+      />
     </>
   );
 }

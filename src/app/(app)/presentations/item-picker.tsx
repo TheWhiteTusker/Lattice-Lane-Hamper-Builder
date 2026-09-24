@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { formatMoney } from "@/lib/pricing";
-import type { DeckItem } from "./actions";
+import type { DeckItem } from "./deck-schemas";
 
 export type PickableItem = {
   type: "hamper" | "product";

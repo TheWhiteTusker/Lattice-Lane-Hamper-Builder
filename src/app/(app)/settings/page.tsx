@@ -2,15 +2,11 @@ import Link from "next/link";
 import { requireRole } from "@/lib/supabase/server";
 import { loadSettings } from "@/lib/settings";
 import { PageHeader } from "@/components/ui";
-import {
-  CompanyForm,
-  TermsForm,
-  DefaultForm,
-  CategoryRow,
-  AddCategoryForm,
-  UserRoleForm,
-  UpdateAppButton,
-} from "./forms";
+import { CompanyForm } from "./_forms/company-form";
+import { TermsForm, DefaultForm } from "./_forms/setting-forms";
+import { CategoryRow, AddCategoryForm } from "./_forms/category-forms";
+import { UserRoleForm } from "./_forms/user-role-form";
+import { UpdateAppButton } from "./_forms/update-app-button";
 import { PickListManager } from "./pick-list-manager";
 import type { Category, Profile } from "@/lib/types";
 import { APP_VERSION } from "@/lib/version";
