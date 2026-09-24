@@ -23,9 +23,13 @@ export function useImageActions(
   const [feedback, setFeedback] = useState<Feedback>({});
   const [isPending, startTransition] = useTransition();
 
-  // A new primary photo takes the badge from the old one.
+  // A new primary photo takes the badge from the old one of the same product
+  // (the list can hold sibling colour products' photos too).
+  const withPrimary = (list: ProductImage[], img: ProductImage) =>
+    list.map((i) => (i.product_id === img.product_id ? { ...i, is_primary: i.id === img.id } : i));
   const withAdded = (list: ProductImage[], img: ProductImage) =>
-    img.is_primary ? list.map((i) => ({ ...i, is_primary: false })).concat(img) : [...list, img];
+    img.is_primary ? withPrimary([...list, img], img) : [...list, img];
+  const ownerOf = (imageId: string) => images.find((i) => i.id === imageId)?.product_id ?? productId;
 
   function upload(files: File[], color: string, asPrimary: boolean) {
     if (!files.length) return;
@@ -65,9 +69,9 @@ export function useImageActions(
 
   function setPrimary(imageId: string) {
     startTransition(async () => {
-      const res = await setPrimaryProductImage(imageId, productId);
+      const res = await setPrimaryProductImage(imageId, ownerOf(imageId));
       if (res.error) return setFeedback({ error: res.error });
-      setImages((prev) => prev.map((img) => ({ ...img, is_primary: img.id === imageId })));
+      if (res.image) setImages((prev) => withPrimary(prev, res.image!));
       setFeedback({ success: "Primary cover image updated." });
     });
   }
@@ -83,7 +87,7 @@ export function useImageActions(
   function remove(imageId: string) {
     if (!confirm("Move this image to the Bin? It will stay in the Bin for 30 days and can be restored anytime.")) return;
     startTransition(async () => {
-      const res = await deleteProductImage(imageId, productId);
+      const res = await deleteProductImage(imageId, ownerOf(imageId));
       if (res.error) return setFeedback({ error: res.error });
       setImages((prev) => prev.filter((img) => img.id !== imageId));
       setFeedback({ success: "Image moved to Bin. You can restore it from the Bin within 30 days." });

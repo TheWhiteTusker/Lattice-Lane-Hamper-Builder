@@ -40,12 +40,8 @@ export function useProductPhotos(initialImages: ProductImage[], selectedProductI
   const [pending, setPending] = useState<Pending[]>([]);
   const [upload, setUpload] = useState<UploadStatus | null>(null);
 
-  // The gallery only manages this product's photos; keep sibling colours' ones.
-  const handleGalleryChange = useCallback(
-    (gallery: ProductImage[]) =>
-      setImages((prev) => [...prev.filter((img) => img.product_id !== selectedProductId), ...gallery]),
-    [selectedProductId],
-  );
+  // The gallery holds every colour's photos, sibling products' included.
+  const handleGalleryChange = useCallback((gallery: ProductImage[]) => setImages(gallery), []);
 
   // Status shows on the row itself so a failure is never silent.
   async function uploadForColor(colName: string, files: File[]) {

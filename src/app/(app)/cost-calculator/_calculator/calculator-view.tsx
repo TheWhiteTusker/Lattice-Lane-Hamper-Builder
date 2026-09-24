@@ -80,7 +80,8 @@ export function CostCalculatorView({
             // Remount after a colour-row upload so the gallery shows it
             key={`${selectedProductId}-${photos.photoVersion}`}
             productId={selectedProductId}
-            initialImages={photos.images.filter((img) => img.product_id === selectedProductId)}
+            // Every colour's photos, including those saved on sibling colour products
+            initialImages={photos.images}
             onImagesChange={photos.handleGalleryChange}
             productName={details.name}
             currentColor={selectedColors[0]}
