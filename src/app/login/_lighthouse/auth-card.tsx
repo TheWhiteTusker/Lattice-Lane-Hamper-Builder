@@ -21,7 +21,7 @@ function Label({ htmlFor, children }: { htmlFor: string; children: React.ReactNo
 export function AuthCard() {
   const router = useRouter();
   const params = useSearchParams();
-  const [mode, setMode] = useState<"signin" | "signup">("signin");
+  const [mode, setMode] = useState<"signin" | "signup" | "reset">("signin");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -36,6 +36,19 @@ export function AuthCard() {
     setError(null);
     setNotice(null);
     const supabase = createClient();
+
+    if (mode === "reset") {
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/reset-password`,
+      });
+      if (error) {
+        setError(error.message);
+        return setBusy(false);
+      }
+      // Neutral wording: never reveal whether an email is registered.
+      setNotice("If that email has an account, a reset link is on its way. Check your inbox.");
+      return setBusy(false);
+    }
 
     if (mode === "signup") {
       const { data, error } = await supabase.auth.signUp({ email, password, options: { data: { full_name: fullName } } });
@@ -74,7 +87,7 @@ export function AuthCard() {
         />
         <div className="h-0.5 w-12 bg-gradient-to-r from-transparent via-amber-300 to-transparent my-1.5" />
         <h1 className="font-display text-xl font-bold tracking-tight text-amber-50">
-          {mode === "signin" ? "Sign in" : "Create account"}
+          {mode === "signin" ? "Sign in" : mode === "signup" ? "Create account" : "Reset password"}
         </h1>
         <p className="mt-0.5 text-xs text-amber-200/70 font-medium">Hamper costing and client quotations</p>
       </div>
@@ -92,6 +105,7 @@ export function AuthCard() {
           <input id="email" type="email" className={inputCls} value={email} onChange={(e) => setEmail(e.target.value)} required autoComplete="email" placeholder="you@latticelane.com" />
         </div>
 
+        {mode !== "reset" && (
         <div>
           <Label htmlFor="password">Password</Label>
           <div className="relative">
@@ -117,6 +131,7 @@ export function AuthCard() {
             </button>
           </div>
         </div>
+        )}
 
         {error && (
           <div role="alert" className="rounded-lg bg-red-950/80 border border-red-500/50 p-2.5 text-xs text-red-200">
@@ -132,20 +147,46 @@ export function AuthCard() {
           className="w-full rounded-lg bg-gradient-to-r from-amber-500 via-amber-400 to-amber-500 hover:from-amber-400 hover:to-amber-300 text-black font-semibold py-2.5 px-4 text-sm shadow-lg shadow-amber-500/25 transition-all duration-200 disabled:opacity-50 mt-2"
           disabled={busy}
         >
-          {busy ? "Verifying…" : mode === "signin" ? "Sign in to workspace" : "Create enterprise account"}
+          {busy
+            ? mode === "reset"
+              ? "Sending…"
+              : "Verifying…"
+            : mode === "signin"
+              ? "Sign in to workspace"
+              : mode === "signup"
+                ? "Create enterprise account"
+                : "Send reset link"}
         </button>
       </form>
 
       <div className="mt-4 pt-3 border-t border-white/10 text-center space-y-2">
+        {mode === "signin" && (
+          <button
+            type="button"
+            className="block w-full text-xs text-amber-300 hover:text-amber-200 hover:underline transition-colors"
+            onClick={() => {
+              setMode("reset");
+              setError(null);
+              setNotice(null);
+            }}
+          >
+            Forgot password?
+          </button>
+        )}
         <button
           type="button"
           className="text-xs text-amber-300 hover:text-amber-200 hover:underline transition-colors"
           onClick={() => {
             setMode(mode === "signin" ? "signup" : "signin");
             setError(null);
+            setNotice(null);
           }}
         >
-          {mode === "signin" ? "First time here? Create an account" : "Already have an account? Sign in"}
+          {mode === "signin"
+            ? "First time here? Create an account"
+            : mode === "signup"
+              ? "Already have an account? Sign in"
+              : "Back to sign in"}
         </button>
         <p className="text-[10px] text-neutral-400">The first account created owns the workspace.</p>
       </div>
