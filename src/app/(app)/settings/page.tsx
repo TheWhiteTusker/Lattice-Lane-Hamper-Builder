@@ -35,6 +35,9 @@ export default async function SettingsPage() {
         <Link href="/cost-calculator/master" className="btn-secondary">
           Rates & Hierarchy Master
         </Link>
+        <Link href="/bin" className="btn-secondary">
+          Recycle Bin
+        </Link>
         {/* LATTICE_DESKTOP is set by electron/main.cjs. */}
         <UpdateAppButton desktop={desktop} />
       </PageHeader>
@@ -147,6 +150,21 @@ export default async function SettingsPage() {
             ))}
           </tbody>
         </table>
+      </section>
+
+      {/* ---------------- recycle bin ---------------- */}
+      <section className="card mt-4 p-4">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h2 className="text-sm font-semibold">Recycle Bin</h2>
+            <p className="mt-0.5 text-xs text-(--color-muted)">
+              View and restore deleted hampers, products, and photos. Items are kept for 30 days before permanent deletion.
+            </p>
+          </div>
+          <Link href="/bin" className="btn-secondary">
+            Open Recycle Bin →
+          </Link>
+        </div>
       </section>
 
       {/* ---------------- app version footer ---------------- */}

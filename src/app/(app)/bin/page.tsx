@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { requireUser, canManage, isAdmin } from "@/lib/supabase/server";
 import { PageHeader } from "@/components/ui";
 import { loadBinItems } from "./data";
@@ -17,7 +18,11 @@ export default async function BinPage() {
       <PageHeader
         title="Recycle Bin"
         subtitle={`${counts.all} item${counts.all === 1 ? "" : "s"} in bin`}
-      />
+      >
+        <Link href="/settings" className="btn-secondary">
+          Settings
+        </Link>
+      </PageHeader>
       <BinView
         initialItems={items}
         counts={counts}

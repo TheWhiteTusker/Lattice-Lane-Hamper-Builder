@@ -53,7 +53,6 @@ export function Nav({ profile, desktop }: { profile: Profile; desktop: boolean }
     { href: "/quotes", label: "Quotes" },
     { href: "/clients", label: "Clients" },
     { href: "/products", label: "Products" },
-    { href: "/bin", label: "Bin" },
     ...(profile.role === "admin" ? [{ href: "/settings", label: "Settings" }] : []),
   ];
 
