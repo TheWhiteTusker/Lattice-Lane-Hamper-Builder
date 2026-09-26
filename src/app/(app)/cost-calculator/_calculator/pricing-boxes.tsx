@@ -1,6 +1,6 @@
 "use client";
 
-import { formatMoney, formatPct, num } from "@/lib/pricing.ts";
+import { formatMoney, formatPct, num } from "@/lib/pricing";
 import type { Pricing } from "./use-pricing";
 
 const box = "rounded-xl border border-slate-200 bg-white p-4 shadow-sm";
@@ -14,7 +14,7 @@ export function PricingBoxes({ pricing }: { pricing: Pricing; source?: string })
     <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
       <div className={box}>
         <span className={caption}>Total Cost Price (CP)</span>
-        <div className="mt-1 font-mono text-2xl font-black text-[var(--color-ink)]">
+        <div className="mt-1 font-mono text-2xl font-black text-(--color-ink)">
           {formatMoney(totals.total_cost)}
         </div>
         <p className={note}>
@@ -35,7 +35,7 @@ export function PricingBoxes({ pricing }: { pricing: Pricing; source?: string })
             onChange={(e) => pricing.changeMarkup(e.target.value)}
             className="input input-num text-lg font-bold font-mono py-1"
           />
-          <span className="text-base font-bold text-[var(--color-muted)]">%</span>
+          <span className="text-base font-bold text-(--color-muted)">%</span>
         </div>
         <p className={note}>Selling Price = CP &divide; (1 &minus; Markup%)</p>
         {num(pricing.markupPct) >= 100 && (
@@ -45,15 +45,15 @@ export function PricingBoxes({ pricing }: { pricing: Pricing; source?: string })
         )}
       </div>
 
-      <div className="rounded-xl border border-[var(--color-brand)] bg-emerald-50/40 p-4 shadow-sm">
+      <div className="rounded-xl border border-(--color-brand) bg-emerald-50/40 p-4 shadow-sm">
         <label
           htmlFor="calc-sp"
-          className="text-xs font-semibold text-[var(--color-brand-dark)] uppercase tracking-wider"
+          className="text-xs font-semibold text-(--color-brand-dark) uppercase tracking-wider"
         >
           Selling Price (SP)
         </label>
         <div className="mt-1 flex items-center gap-1">
-          <span className="text-lg font-bold text-[var(--color-brand-dark)]">₹</span>
+          <span className="text-lg font-bold text-(--color-brand-dark)">₹</span>
           <input
             id="calc-sp"
             type="number"
@@ -62,7 +62,7 @@ export function PricingBoxes({ pricing }: { pricing: Pricing; source?: string })
             onChange={(e) => pricing.changeSp(e.target.value)}
             onBlur={() => pricing.roundManualSp()}
             placeholder={String(totals.calculated_sp)}
-            className="input input-num text-lg font-black font-mono py-1 text-[var(--color-brand-dark)]"
+            className="input input-num text-lg font-black font-mono py-1 text-(--color-brand-dark)"
           />
         </div>
         <p className={note}>Default catalogue price saved to product</p>

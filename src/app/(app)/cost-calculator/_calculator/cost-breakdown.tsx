@@ -1,7 +1,7 @@
 "use client";
 
-import type { CostSheetTotals } from "@/lib/costing.ts";
-import { formatMoney, formatPct } from "@/lib/pricing.ts";
+import type { CostSheetTotals } from "@/lib/costing";
+import { formatMoney, formatPct } from "@/lib/pricing";
 
 /** Stage share of the cost price, as one stacked bar with a legend. */
 export function CostBreakdown({ totals }: { totals: CostSheetTotals }) {

@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
-import { calculateCostSheetTotals } from "@/lib/costing.ts";
-import { num, round2, roundUpToNext10 } from "@/lib/pricing.ts";
+import { calculateCostSheetTotals } from "@/lib/costing";
+import { num, round2, roundUpToNext10 } from "@/lib/pricing";
 import type { Product, ProductCostSheet } from "@/lib/types";
 import type { LineState } from "./lines";
 

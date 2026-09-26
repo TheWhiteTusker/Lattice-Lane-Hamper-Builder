@@ -1,6 +1,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { formatMoney, num } from "@/lib/pricing.ts";
+import { formatMoney, num } from "@/lib/pricing";
+import { productHref } from "../../products/href";
 import type { ProductCostSheet } from "@/lib/types";
 import { saveCostSheetAndProduct } from "../actions";
 import { toSavedLine, type LineState } from "./lines";
@@ -64,7 +65,7 @@ export function useSaveCosting({
       // All good: redirect to the expanded product page of that specific product
       if (!photo.failed) {
         const targetCode = res.productCode ?? code;
-        router.push(`/products/${encodeURIComponent(targetCode)}`);
+        router.push(productHref(targetCode));
         return;
       }
 

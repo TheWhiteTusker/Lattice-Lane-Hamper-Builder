@@ -14,22 +14,7 @@ export type MasterCtx = {
   editVariety: (subcategoryId: string, variety: Partial<CostVariety>) => void;
 };
 
-export function Chevron({ open }: { open: boolean }) {
-  return (
-    <svg
-      className={`h-4 w-4 shrink-0 text-[var(--color-muted)] transition-transform duration-150 ${open ? "rotate-90" : ""}`}
-      viewBox="0 0 20 20"
-      fill="currentColor"
-      aria-hidden="true"
-    >
-      <path
-        fillRule="evenodd"
-        d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z"
-        clipRule="evenodd"
-      />
-    </svg>
-  );
-}
+export { Chevron } from "@/components/ui";
 
 /** Inline name box for adding a category or subcategory. */
 export function InlineAdd({
@@ -50,7 +35,7 @@ export function InlineAdd({
   const [value, setValue] = useState("");
   return (
     <div
-      className={`rounded-lg border border-[var(--color-brand)] p-3 flex flex-wrap items-center gap-3 ${className}`}
+      className={`rounded-lg border border-(--color-brand) p-3 flex flex-wrap items-center gap-3 ${className}`}
     >
       <input
         value={value}

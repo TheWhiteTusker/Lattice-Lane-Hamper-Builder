@@ -1,7 +1,7 @@
 "use client";
 
-import { formatMoney } from "@/lib/pricing.ts";
-import { isTimeUnit, type DimensionUnit } from "@/lib/costing.ts";
+import { formatMoney } from "@/lib/pricing";
+import { isTimeUnit, type DimensionUnit } from "@/lib/costing";
 import type { CostStageWithHierarchy } from "@/lib/types";
 import { NumCell, RemoveButton, UnitCell } from "./cells";
 import type { LineState } from "./lines";
@@ -85,7 +85,7 @@ export function StageLineRow({
             options={sub?.varieties ?? []}
             placeholder="Select…"
             disabled={!line.subcategory_name}
-            className="font-semibold text-[var(--color-brand-dark)]"
+            className="font-semibold text-(--color-brand-dark)"
             onChange={(name) => api.setVariety(line, name)}
           />
         </>
@@ -134,13 +134,13 @@ export function StageLineRow({
           </td>
         </>
       ) : (
-        <td colSpan={3} className="p-2 text-center text-[11px] text-[var(--color-muted)]">
+        <td colSpan={3} className="p-2 text-center text-[11px] text-(--color-muted)">
           Priced on time
         </td>
       )}
       {isMachine &&
         (sized ? (
-          <td className="p-2 text-center text-[11px] text-[var(--color-muted)]">—</td>
+          <td className="p-2 text-center text-[11px] text-(--color-muted)">—</td>
         ) : (
           <td className="p-2">
             <div className="flex items-center gap-1">
@@ -152,7 +152,7 @@ export function StageLineRow({
                 placeholder="15"
                 className="input input-num text-xs py-1 px-2"
               />
-              <span className="text-[11px] text-[var(--color-muted)]">min</span>
+              <span className="text-[11px] text-(--color-muted)">min</span>
             </div>
           </td>
         ))}
@@ -170,14 +170,14 @@ export function StageLineRow({
       )}
       <NumCell value={line.qty} min="0" onChange={(qty) => set({ qty: qty ?? 0 })} />
       {stage.code === "bought_out" ? (
-        <td className="p-2 text-center text-xs text-[var(--color-muted)]" title="Bought-out items have 0% wastage">
+        <td className="p-2 text-center text-xs text-(--color-muted)" title="Bought-out items have 0% wastage">
           0%
         </td>
       ) : (
         <NumCell value={line.wastage_pct} min="0" onChange={(w) => set({ wastage_pct: w ?? 0 })} />
       )}
 
-      <td className="p-2 text-right font-mono font-semibold text-[var(--color-ink)]">
+      <td className="p-2 text-right font-mono font-semibold text-(--color-ink)">
         {formatMoney(line.line_total)}
       </td>
       <td className="p-2 text-center">
@@ -186,7 +186,7 @@ export function StageLineRow({
             type="button"
             onClick={() => api.duplicate(line.tempKey)}
             title="Duplicate this line (copy details to quick-edit)"
-            className="rounded px-2 py-1 text-[11px] font-semibold text-[var(--color-brand)] hover:bg-emerald-50 hover:text-[var(--color-brand-dark)] transition-colors"
+            className="rounded px-2 py-1 text-[11px] font-semibold text-(--color-brand) hover:bg-emerald-50 hover:text-(--color-brand-dark) transition-colors"
           >
             Duplicate
           </button>

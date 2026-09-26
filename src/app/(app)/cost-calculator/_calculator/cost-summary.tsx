@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { productHref } from "../../products/href";
 import { CostBreakdown } from "./cost-breakdown";
 import { PricingBoxes } from "./pricing-boxes";
 import type { Pricing } from "./use-pricing";
@@ -22,8 +23,8 @@ export function CostSummary({
   onSave: () => void;
 }) {
   return (
-    <div className="card p-5 bg-gradient-to-br from-white to-slate-50 border-2 border-[var(--color-brand)]/20 shadow-md">
-      <h3 className="text-base font-bold text-[var(--color-ink)] mb-4">
+    <div className="card p-5 bg-linear-to-br from-white to-slate-50 border-2 border-(--color-brand)/20 shadow-md">
+      <h3 className="text-base font-bold text-(--color-ink) mb-4">
         Cost Breakdown & Selling Price Master
       </h3>
 
@@ -60,13 +61,13 @@ export function CostSummary({
         </div>
       )}
 
-      <div className="mt-6 flex flex-wrap items-center justify-between gap-4 border-t border-[var(--color-border)] pt-4">
+      <div className="mt-6 flex flex-wrap items-center justify-between gap-4 border-t border-(--color-border) pt-4">
         <div className="flex items-center gap-2">
           <Link href="/products" className="btn-secondary">
             &larr; Back to Products
           </Link>
           {details.selectedProductId && (
-            <Link href={`/products/${encodeURIComponent(details.code)}`} className="btn-secondary">
+            <Link href={productHref(details.code)} className="btn-secondary">
               View in Product Master
             </Link>
           )}

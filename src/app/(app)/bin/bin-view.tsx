@@ -3,6 +3,8 @@
 import { useState, useTransition, useMemo } from "react";
 import type { BinItem, BinCounts, BinItemType } from "./bin-types";
 import { BinItemRow } from "./bin-item-row";
+import { BinHeader } from "./bin-header";
+import { BinToolbar } from "./bin-toolbar";
 import { emptyBinAction, purgeExpiredAction } from "./actions";
 
 export function BinView({
@@ -87,13 +89,13 @@ export function BinView({
           className={`flex items-center justify-between rounded-lg border px-4 py-3 text-sm transition-all ${
             notification.error
               ? "border-red-200 bg-red-50 text-red-800"
-              : "border-[var(--color-line)] bg-[#faf8ee] text-[var(--color-ink)]"
+              : "border-line bg-paper text-(--color-ink)"
           }`}
         >
           <div className="flex items-center gap-2">
             <span
               className={`inline-block h-2 w-2 rounded-full ${
-                notification.error ? "bg-red-500" : "bg-[var(--color-brand)]"
+                notification.error ? "bg-red-500" : "bg-(--color-brand)"
               }`}
             />
             <span>{notification.text}</span>
@@ -109,106 +111,29 @@ export function BinView({
       )}
 
       {/* Overview & explanation banner */}
-      <div className="card flex flex-wrap items-center justify-between gap-3 p-4 bg-white border-[var(--color-line)]">
-        <div className="text-sm text-[var(--color-muted)]">
-          <p>
-            <strong className="text-[var(--color-ink)]">30-Day Retention Policy:</strong> Deleted
-            hampers, products, and photos are safely stored here for 30 days before being permanently
-            removed. You can restore them to active use at any time within this window.
-          </p>
-        </div>
-
-        <div className="flex items-center gap-2">
-          {counts.expired > 0 && canManage && (
-            <button
-              type="button"
-              onClick={handlePurgeExpired}
-              disabled={isPending}
-              className="btn-danger text-xs px-3 py-1.5"
-            >
-              Purge Expired ({counts.expired})
-            </button>
-          )}
-
-          {(canManage || isAdmin) && counts.all > 0 && (
-            <button
-              type="button"
-              onClick={handleEmptyBin}
-              disabled={isPending}
-              className="btn-secondary text-xs px-3 py-1.5 hover:border-red-300 hover:text-red-700"
-            >
-              Empty {selectedTab === "all" ? "Bin" : selectedTab}
-            </button>
-          )}
-        </div>
-      </div>
+      <BinHeader
+        counts={counts}
+        selectedTab={selectedTab}
+        canManage={canManage}
+        isAdmin={isAdmin}
+        isPending={isPending}
+        onEmptyBin={handleEmptyBin}
+        onPurgeExpired={handlePurgeExpired}
+      />
 
       {/* Tabs and Search Bar */}
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        {/* Navigation Tabs */}
-        <div className="flex items-center gap-1 rounded-full border border-[var(--color-line)] bg-white p-1 shadow-2xs">
-          <button
-            type="button"
-            onClick={() => setSelectedTab("all")}
-            className={`rounded-full px-3.5 py-1 text-xs font-medium transition-colors ${
-              selectedTab === "all"
-                ? "bg-[var(--color-brand)] text-white"
-                : "text-[var(--color-muted)] hover:text-[var(--color-ink)]"
-            }`}
-          >
-            All Items ({counts.all})
-          </button>
-          <button
-            type="button"
-            onClick={() => setSelectedTab("hamper")}
-            className={`rounded-full px-3.5 py-1 text-xs font-medium transition-colors ${
-              selectedTab === "hamper"
-                ? "bg-[var(--color-brand)] text-white"
-                : "text-[var(--color-muted)] hover:text-[var(--color-ink)]"
-            }`}
-          >
-            Hampers ({counts.hampers})
-          </button>
-          <button
-            type="button"
-            onClick={() => setSelectedTab("product")}
-            className={`rounded-full px-3.5 py-1 text-xs font-medium transition-colors ${
-              selectedTab === "product"
-                ? "bg-[var(--color-brand)] text-white"
-                : "text-[var(--color-muted)] hover:text-[var(--color-ink)]"
-            }`}
-          >
-            Products ({counts.products})
-          </button>
-          <button
-            type="button"
-            onClick={() => setSelectedTab("image")}
-            className={`rounded-full px-3.5 py-1 text-xs font-medium transition-colors ${
-              selectedTab === "image"
-                ? "bg-[var(--color-brand)] text-white"
-                : "text-[var(--color-muted)] hover:text-[var(--color-ink)]"
-            }`}
-          >
-            Photos ({counts.images})
-          </button>
-        </div>
-
-        {/* Search within Bin */}
-        <div className="min-w-[220px]">
-          <input
-            type="search"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Filter by name or code…"
-            className="input text-xs"
-          />
-        </div>
-      </div>
+      <BinToolbar
+        counts={counts}
+        selectedTab={selectedTab}
+        onTabChange={setSelectedTab}
+        searchQuery={searchQuery}
+        onSearchChange={setSearchQuery}
+      />
 
       {/* Items Table */}
       {filteredItems.length > 0 ? (
         <div className="card overflow-x-auto shadow-2xs">
-          <table className="table min-w-[850px]">
+          <table className="table min-w-212.5">
             <thead>
               <tr>
                 <th className="w-14"></th>
@@ -235,17 +160,17 @@ export function BinView({
         </div>
       ) : (
         <div className="card flex flex-col items-center justify-center p-12 text-center">
-          <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-[var(--color-paper)] border border-[var(--color-line)] text-xl text-[var(--color-muted)]">
+          <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-paper border border-line text-xl text-(--color-muted)">
             🗑️
           </div>
-          <h3 className="font-display text-base font-semibold text-[var(--color-ink)]">
+          <h3 className="font-display text-base font-semibold text-(--color-ink)">
             {searchQuery
               ? "No matching items found"
               : selectedTab === "all"
                 ? "The Bin is empty"
                 : `No deleted ${selectedTab}s in the Bin`}
           </h3>
-          <p className="mt-1 max-w-sm text-xs text-[var(--color-muted)]">
+          <p className="mt-1 max-w-sm text-xs text-(--color-muted)">
             {searchQuery
               ? "Try adjusting your search query or switching tabs."
               : "When hampers, products, or photos are deleted, they will sit here for 30 days before permanent deletion."}

@@ -1,7 +1,7 @@
 "use client";
 
-import { withOverhead } from "@/lib/costing.ts";
-import { formatMoney, num } from "@/lib/pricing.ts";
+import { withOverhead } from "@/lib/costing";
+import { formatMoney, num } from "@/lib/pricing";
 import type { CostStageWithHierarchy } from "@/lib/types";
 import { OverheadInput, SectionHeader } from "./cells";
 import { StageLineRow } from "./stage-line-row";
@@ -43,13 +43,13 @@ export function StageSection({
             onClick={onToggle}
             aria-expanded={!collapsed}
             title={collapsed ? `Expand ${stage.name}` : `Collapse ${stage.name}`}
-            className="flex h-6 w-6 items-center justify-center rounded border border-[var(--color-border)] bg-white text-sm font-bold leading-none text-[var(--color-brand-dark)] shadow-xs transition-colors hover:bg-emerald-50"
+            className="flex h-6 w-6 items-center justify-center rounded border border-(--color-border) bg-white text-sm font-bold leading-none text-(--color-brand-dark) shadow-xs transition-colors hover:bg-emerald-50"
           >
             {collapsed ? "+" : "−"}
           </button>
         }
         badge={
-          <span className="flex h-7 w-7 items-center justify-center rounded-full bg-[var(--color-brand)] text-xs font-bold text-white">
+          <span className="flex h-7 w-7 items-center justify-center rounded-full bg-(--color-brand) text-xs font-bold text-white">
             {stage.sort_order}
           </span>
         }
@@ -84,38 +84,38 @@ export function StageSection({
           <div className="overflow-x-auto p-2">
             <table className="w-full text-left text-xs">
               <thead>
-                <tr className="border-b border-[var(--color-border)] text-[var(--color-muted)] font-semibold">
+                <tr className="border-b border-(--color-border) text-(--color-muted) font-semibold">
                   {hasCats ? (
                     <>
-                      <th className="p-2 min-w-[130px]">Category</th>
-                      <th className="p-2 min-w-[130px]">Subcategory</th>
-                      <th className="p-2 min-w-[120px]">Variety</th>
+                      <th className="p-2 min-w-32.5">Category</th>
+                      <th className="p-2 min-w-32.5">Subcategory</th>
+                      <th className="p-2 min-w-30">Variety</th>
                     </>
                   ) : (
-                    <th className="p-2 min-w-[260px]">Description</th>
+                    <th className="p-2 min-w-65">Description</th>
                   )}
-                  <th className="p-2 min-w-[85px]">Length</th>
-                  <th className="p-2 min-w-[85px]">Breadth</th>
-                  <th className="p-2 min-w-[80px]">Dim Unit</th>
-                  {isMachine && <th className="p-2 min-w-[110px]">Duration (Mins)</th>}
+                  <th className="p-2 min-w-21.25">Length</th>
+                  <th className="p-2 min-w-21.25">Breadth</th>
+                  <th className="p-2 min-w-20">Dim Unit</th>
+                  {isMachine && <th className="p-2 min-w-27.5">Duration (Mins)</th>}
                   {hasCats ? (
-                    <th className="p-2 min-w-[110px]">Rate / Unit</th>
+                    <th className="p-2 min-w-27.5">Rate / Unit</th>
                   ) : (
                     <>
-                      <th className="p-2 min-w-[85px]">Rate</th>
-                      <th className="p-2 min-w-[90px]">Unit</th>
+                      <th className="p-2 min-w-21.25">Rate</th>
+                      <th className="p-2 min-w-22.5">Unit</th>
                     </>
                   )}
-                  <th className="p-2 min-w-[65px]">Qty</th>
-                  <th className="p-2 min-w-[75px]">Wastage %</th>
-                  <th className="p-2 text-right min-w-[95px]">Total Cost</th>
-                  <th className="p-2 text-center min-w-[100px]">Actions</th>
+                  <th className="p-2 min-w-16.25">Qty</th>
+                  <th className="p-2 min-w-18.75">Wastage %</th>
+                  <th className="p-2 text-right min-w-23.75">Total Cost</th>
+                  <th className="p-2 text-center min-w-25">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-[var(--color-border)]">
+              <tbody className="divide-y divide-(--color-border)">
                 {stageLines.length === 0 ? (
                   <tr>
-                    <td colSpan={colCount} className="py-6 text-center text-sm text-[var(--color-muted)]">
+                    <td colSpan={colCount} className="py-6 text-center text-sm text-(--color-muted)">
                       No lines added for {stage.name}. Click &ldquo;+ Add Line&rdquo; below to start.
                     </td>
                   </tr>
@@ -128,7 +128,7 @@ export function StageSection({
             </table>
           </div>
 
-          <div className="border-t border-[var(--color-border)] bg-slate-50/50 p-2 text-right">
+          <div className="border-t border-(--color-border) bg-slate-50/50 p-2 text-right">
             <button
               type="button"
               onClick={() => api.addToStage(stage.code)}
