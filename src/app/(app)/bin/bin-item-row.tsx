@@ -3,7 +3,8 @@
 import { useTransition } from "react";
 import Image from "next/image";
 import type { BinItem } from "./bin-types";
-import { restoreBinItem, permanentlyDeleteBinItem } from "./actions";
+import { restoreBinItem } from "./bin-restore";
+import { permanentlyDeleteBinItem } from "./bin-delete";
 
 export function BinItemRow({
   item,
@@ -79,7 +80,7 @@ export function BinItemRow({
         {item.daysRemaining} days left
       </span>
     ) : (
-      <span className="inline-flex items-center gap-1 rounded-full border border-[var(--color-line)] bg-[var(--color-paper)] px-2.5 py-0.5 text-xs text-[var(--color-muted)]">
+      <span className="inline-flex items-center gap-1 rounded-full border border-line bg-paper px-2.5 py-0.5 text-xs text-(--color-muted)">
         {item.daysRemaining} days left
       </span>
     );
@@ -94,7 +95,7 @@ export function BinItemRow({
     <tr className={`transition-opacity ${isPending ? "opacity-40" : ""}`}>
       {/* Thumbnail */}
       <td className="w-14 py-2.5">
-        <div className="relative h-12 w-12 shrink-0 overflow-hidden rounded-md border border-[var(--color-line)] bg-[var(--color-paper)]">
+        <div className="relative h-12 w-12 shrink-0 overflow-hidden rounded-md border border-line bg-paper">
           {item.imageUrl ? (
             <Image
               src={item.imageUrl}
@@ -104,7 +105,7 @@ export function BinItemRow({
               className="object-cover"
             />
           ) : (
-            <div className="flex h-full w-full items-center justify-center text-xs text-[var(--color-muted)]">
+            <div className="flex h-full w-full items-center justify-center text-xs text-(--color-muted)">
               No pic
             </div>
           )}
@@ -121,20 +122,20 @@ export function BinItemRow({
       </td>
 
       {/* Code */}
-      <td className="w-32 whitespace-nowrap font-mono text-xs font-medium text-[var(--color-ink)] py-2.5">
+      <td className="w-32 whitespace-nowrap font-mono text-xs font-medium text-(--color-ink) py-2.5">
         {item.code || "—"}
       </td>
 
       {/* Title & Details */}
       <td className="py-2.5">
-        <div className="font-medium text-[var(--color-ink)]">{item.title}</div>
+        <div className="font-medium text-(--color-ink)">{item.title}</div>
         {item.subtitle && (
-          <div className="text-xs text-[var(--color-muted)]">{item.subtitle}</div>
+          <div className="text-xs text-(--color-muted)">{item.subtitle}</div>
         )}
       </td>
 
       {/* Deleted Date */}
-      <td className="whitespace-nowrap text-xs text-[var(--color-muted)] py-2.5">
+      <td className="whitespace-nowrap text-xs text-(--color-muted) py-2.5">
         {formattedDate}
       </td>
 
@@ -149,7 +150,7 @@ export function BinItemRow({
               type="button"
               onClick={handleRestore}
               disabled={isPending}
-              className="btn-secondary text-xs px-3 py-1 font-medium hover:border-[var(--color-brand)] hover:text-[var(--color-brand)]"
+              className="btn-secondary text-xs px-3 py-1 font-medium hover:border-(--color-brand) hover:text-(--color-brand)"
               title="Restore to active use"
             >
               Restore
@@ -165,7 +166,7 @@ export function BinItemRow({
             </button>
           </div>
         ) : (
-          <span className="text-xs text-[var(--color-muted)]">Read-only</span>
+          <span className="text-xs text-(--color-muted)">Read-only</span>
         )}
       </td>
     </tr>

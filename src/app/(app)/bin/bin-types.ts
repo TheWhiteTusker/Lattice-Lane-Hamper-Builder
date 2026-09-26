@@ -33,3 +33,9 @@ export type BinCounts = {
   images: number;
   expired: number;
 };
+
+export type BinActionResult = {
+  ok?: boolean;
+  error?: string;
+  message?: string;
+};

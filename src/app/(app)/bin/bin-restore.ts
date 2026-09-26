@@ -3,13 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { requireUser, canManage, isAdmin } from "@/lib/supabase/server";
 import { describeError } from "@/lib/forms";
-import type { BinItemType } from "./bin-types";
-
-export type BinActionResult = {
-  ok?: boolean;
-  error?: string;
-  message?: string;
-};
+import type { BinItemType, BinActionResult } from "./bin-types";
 
 /**
  * Restores a soft-deleted item from the Bin back into active use.

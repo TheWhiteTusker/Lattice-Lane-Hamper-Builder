@@ -5,7 +5,8 @@ import type { BinItem, BinCounts, BinItemType } from "./bin-types";
 import { BinItemRow } from "./bin-item-row";
 import { BinHeader } from "./bin-header";
 import { BinToolbar } from "./bin-toolbar";
-import { emptyBinAction, purgeExpiredAction } from "./actions";
+import { emptyBinAction } from "./bin-delete";
+import { purgeExpiredAction } from "./bin-purge";
 
 export function BinView({
   initialItems,
