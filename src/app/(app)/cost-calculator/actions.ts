@@ -131,6 +131,7 @@ export async function saveCostSheetAndProduct(payload: SaveCostSheetPayload) {
 
     revalidatePath("/cost-calculator", "layout");
     revalidatePath("/products");
+    revalidatePath("/products/new");
     revalidatePath(`/products/${encodeURIComponent(code)}`);
     for (const v of saved.variants) {
       revalidatePath(`/products/${encodeURIComponent(v.code)}`);

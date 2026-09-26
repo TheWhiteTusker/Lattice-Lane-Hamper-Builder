@@ -2,6 +2,18 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   output: process.env.BUILD_STANDALONE === "true" ? "standalone" : undefined,
+  images: {
+    remotePatterns: [
+      {
+        protocol: "https",
+        hostname: "*.supabase.co",
+      },
+      {
+        protocol: "https",
+        hostname: "hoftbldhndnngjfjsqhs.supabase.co",
+      },
+    ],
+  },
   experimental: {
     // The spreadsheet import posts six parsed CSVs in one server action.
     serverActions: { bodySizeLimit: "15mb" },

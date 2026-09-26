@@ -32,6 +32,9 @@ export default async function SettingsPage() {
         <Link href="/admin/refresh-prices" className="btn-secondary">
           Refresh prices
         </Link>
+        <Link href="/cost-calculator/master" className="btn-secondary">
+          Rates & Hierarchy Master
+        </Link>
         {/* LATTICE_DESKTOP is set by electron/main.cjs. */}
         <UpdateAppButton desktop={desktop} />
       </PageHeader>
@@ -54,9 +57,9 @@ export default async function SettingsPage() {
 
       {/* ---------------- categories ---------------- */}
       <section className="card mt-4 overflow-hidden">
-        <div className="border-b border-[var(--color-line)] px-4 py-3">
+        <div className="border-b border-line px-4 py-3">
           <h2 className="text-sm font-semibold">Categories</h2>
-          <p className="mt-0.5 text-xs text-[var(--color-muted)]">
+          <p className="mt-0.5 text-xs text-(--color-muted)">
             &ldquo;Counts as an item&rdquo; decides what goes into a hamper&rsquo;s item count.
             Turn it off for boxes, filler and ribbon: they add cost, but a client does not
             count the box as one of the gifts.
@@ -72,12 +75,12 @@ export default async function SettingsPage() {
         </table>
 
         {(categories ?? []).length === 0 && (
-          <p className="px-4 py-6 text-sm text-[var(--color-muted)]">
+          <p className="px-4 py-6 text-sm text-(--color-muted)">
             No categories yet. Import the Settings tab, or add them here.
           </p>
         )}
 
-        <div className="border-t border-[var(--color-line)]">
+        <div className="border-t border-line">
           <AddCategoryForm nextSortOrder={nextSortOrder} />
         </div>
       </section>
@@ -85,7 +88,7 @@ export default async function SettingsPage() {
       {/* ---------------- pick-lists ---------------- */}
       <section className="card mt-4 p-4">
         <h2 className="text-sm font-semibold">Pick-lists</h2>
-        <p className="mt-0.5 text-xs text-[var(--color-muted)]">
+        <p className="mt-0.5 text-xs text-(--color-muted)">
           Manage the standard options that fill dropdowns across the app.
         </p>
 
@@ -93,8 +96,8 @@ export default async function SettingsPage() {
           <PickListManager settings={settings} />
         </div>
 
-        <div className="mt-6 border-t border-[var(--color-line)] pt-4">
-          <h3 className="text-xs font-semibold uppercase tracking-wider text-[var(--color-muted)]">
+        <div className="mt-6 border-t border-line pt-4">
+          <h3 className="text-xs font-semibold uppercase tracking-wider text-(--color-muted)">
             Default Selections
           </h3>
           <div className="mt-3 grid gap-3 md:grid-cols-3">
@@ -122,9 +125,9 @@ export default async function SettingsPage() {
 
       {/* ---------------- users ---------------- */}
       <section className="card mt-4 overflow-hidden">
-        <div className="border-b border-[var(--color-line)] px-4 py-3">
+        <div className="border-b border-line px-4 py-3">
           <h2 className="text-sm font-semibold">Users</h2>
-          <p className="mt-0.5 text-xs text-[var(--color-muted)]">
+          <p className="mt-0.5 text-xs text-(--color-muted)">
             People sign up themselves and start as Sales. Once your team is set up, turn off
             new sign-ups in the Supabase dashboard under Authentication → Providers.
           </p>
@@ -147,15 +150,15 @@ export default async function SettingsPage() {
       </section>
 
       {/* ---------------- app version footer ---------------- */}
-      <footer className="mt-8 mb-4 border-t border-[var(--color-line)] pt-6 text-center text-xs text-[var(--color-muted)]">
-        <p className="font-semibold text-[var(--color-ink)]">
+      <footer className="mt-8 mb-4 border-t border-line pt-6 text-center text-xs text-(--color-muted)">
+        <p className="font-semibold text-(--color-ink)">
           Lattice Lane Hamper Builder
         </p>
         {/* Only the desktop app has a real version: CI bumps package.json for
             the desktop build alone, so the website would always read 0.2.4. */}
         {desktop && (
           <p className="mt-1">
-            Version <span className="font-mono font-medium text-[var(--color-brand)]">v{APP_VERSION}</span>
+            Version <span className="font-mono font-medium text-(--color-brand)">v{APP_VERSION}</span>
           </p>
         )}
       </footer>

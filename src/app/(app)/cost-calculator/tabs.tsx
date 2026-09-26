@@ -16,8 +16,8 @@ export function CostTabs() {
   return (
     <div className="flex items-center gap-1 rounded-lg bg-slate-100 p-1">
       {/* On a product's costing the tab stays on that product. */}
-      <Link href={master ? "/cost-calculator" : pathname} className={tabClass(!master)}>
-        Cost Calculator
+      <Link href={master ? "/products/new" : pathname} className={tabClass(!master)}>
+        {master ? "New Product" : "Costing Editor"}
       </Link>
       <Link href="/cost-calculator/master" className={tabClass(master)}>
         Rates & Hierarchy Master

@@ -41,11 +41,11 @@ export function useProductDetails({
   const [notes, setNotes] = useState(initialSheet?.notes ?? "");
   const parsedCode = parseProductCode(code);
 
-  // Each product's costing is its own page; a blank one is /cost-calculator.
+  // Each product's costing is its own page; a blank one is /products/new.
   function selectProduct(prodId: string) {
     setSelectedProductId(prodId);
     const prod = products.find((p) => p.id === prodId);
-    router.push(prod ? costingHref(prod.code) : "/cost-calculator");
+    router.push(prod ? costingHref(prod.code) : "/products/new");
   }
 
   // Product Origin decides whether the stages start collapsed.

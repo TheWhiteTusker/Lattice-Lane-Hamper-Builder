@@ -1,26 +1,29 @@
+import Link from "next/link";
 import { requireRole } from "@/lib/supabase/server";
-import { loadSettings } from "@/lib/settings";
-import { resolveColors } from "@/lib/product-code";
 import { PageHeader } from "@/components/ui";
-import { ProductForm } from "../product-form";
-import type { Category } from "@/lib/types";
+import { CalculatorScreen } from "../../cost-calculator/calculator-screen";
 
-export default async function NewProductPage() {
-  const { supabase } = await requireRole("admin");
+type Search = Promise<Record<string, string | string[] | undefined>>;
+const one = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v) ?? "";
 
-  const [{ data: categories }, settings] = await Promise.all([
-    supabase.from("categories").select("*").order("sort_order").order("name").returns<Category[]>(),
-    loadSettings(supabase),
-  ]);
+export default async function NewProductPage({ searchParams }: { searchParams: Search }) {
+  await requireRole("admin");
+  const params = await searchParams;
 
   return (
     <>
-      <PageHeader title="New product" subtitle="Adds a line to the Product Master" />
-      <ProductForm
-        categories={categories ?? []}
-        sources={settings.sources}
-        allColors={resolveColors(settings.product_colors, settings.color_hex)}
-      />
+      <PageHeader
+        title="New product"
+        subtitle="Stage-by-stage costing engine: Material, Hardware, Finishing & Machine per-minute costs"
+      >
+        <Link href="/products" className="btn-secondary">
+          Back to products
+        </Link>
+        <Link href="/cost-calculator/master" className="btn-secondary">
+          Rates & Hierarchy Master
+        </Link>
+      </PageHeader>
+      <CalculatorScreen saved={one(params.saved) || undefined} t={one(params.t)} />
     </>
   );
 }

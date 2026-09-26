@@ -44,9 +44,6 @@ export default async function ProductsPage({ searchParams }: { searchParams: Sea
         title="Product Master"
         subtitle={`${total} product${total === 1 ? "" : "s"}${showInactive ? " including inactive" : ""}`}
       >
-        <Link href="/cost-calculator" className="btn-secondary">
-          Cost Calculator
-        </Link>
         <a href="/api/products/export" className="btn-secondary">
           Export CSV
         </a>
@@ -63,19 +60,19 @@ export default async function ProductsPage({ searchParams }: { searchParams: Sea
       </PageHeader>
 
       {one(params.deleted) === "1" && (
-        <div className="mb-4 flex items-center justify-between rounded-lg border border-[var(--color-line)] bg-[#faf8ee] px-4 py-3 text-sm text-[var(--color-ink)] shadow-xs">
+        <div className="mb-4 flex items-center justify-between rounded-lg border border-line bg-paper px-4 py-3 text-sm text-(--color-ink) shadow-xs">
           <div className="flex items-center gap-2">
             <span className="inline-block h-2 w-2 rounded-full bg-emerald-600" />
             <span>Product moved to Bin. It will remain in the Bin for 30 days and can be restored anytime.</span>
           </div>
-          <Link href="/bin?tab=products" className="font-semibold text-[var(--color-brand)] underline hover:text-[var(--color-brand-dark)]">
+          <Link href="/bin?tab=products" className="font-semibold text-(--color-brand) underline hover:text-(--color-brand-dark)">
             Open Bin →
           </Link>
         </div>
       )}
 
       <form className="card mb-4 flex flex-wrap items-end gap-3 p-3">
-        <div className="min-w-[220px] flex-1">
+        <div className="min-w-55 flex-1">
           <label className="label" htmlFor="q">
             Search
           </label>
@@ -88,7 +85,7 @@ export default async function ProductsPage({ searchParams }: { searchParams: Sea
           />
         </div>
 
-        <div className="min-w-[180px]">
+        <div className="min-w-45">
           <label className="label" htmlFor="category">
             Category
           </label>
