@@ -85,7 +85,7 @@ export function AuthCard() {
           priority
           className="h-16 sm:h-20 w-auto object-contain drop-shadow-[0_2px_12px_rgba(251,191,36,0.3)] mb-1"
         />
-        <div className="h-0.5 w-12 bg-gradient-to-r from-transparent via-amber-300 to-transparent my-1.5" />
+        <div className="h-0.5 w-12 bg-linear-to-r from-transparent via-amber-300 to-transparent my-1.5" />
         <h1 className="font-display text-xl font-bold tracking-tight text-amber-50">
           {mode === "signin" ? "Sign in" : mode === "signup" ? "Create account" : "Reset password"}
         </h1>
@@ -144,7 +144,7 @@ export function AuthCard() {
 
         <button
           type="submit"
-          className="w-full rounded-lg bg-gradient-to-r from-amber-500 via-amber-400 to-amber-500 hover:from-amber-400 hover:to-amber-300 text-black font-semibold py-2.5 px-4 text-sm shadow-lg shadow-amber-500/25 transition-all duration-200 disabled:opacity-50 mt-2"
+          className="w-full rounded-lg bg-linear-to-r from-amber-500 via-amber-400 to-amber-500 hover:from-amber-400 hover:to-amber-300 text-black font-semibold py-2.5 px-4 text-sm shadow-lg shadow-amber-500/25 transition-all duration-200 disabled:opacity-50 mt-2"
           disabled={busy}
         >
           {busy

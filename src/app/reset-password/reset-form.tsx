@@ -12,6 +12,15 @@ const inputCls =
 
 type Status = "checking" | "ready" | "invalid" | "done";
 
+function Card({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="w-full max-w-[360px] p-6 sm:p-7 rounded-2xl bg-[#080b0a]/90 backdrop-blur-2xl border border-amber-200/40 shadow-[0_20px_50px_rgba(0,0,0,0.85)] text-white">
+      <h1 className="font-display text-xl font-bold tracking-tight text-amber-50 text-center">Reset password</h1>
+      {children}
+    </div>
+  );
+}
+
 /**
  * Landing page for the recovery email link. The browser client detects the
  * code in the URL and exchanges it for a session (PKCE, same device), firing
@@ -65,13 +74,6 @@ export function ResetForm() {
     setBusy(false);
   }
 
-  const Card = ({ children }: { children: React.ReactNode }) => (
-    <div className="w-full max-w-[360px] p-6 sm:p-7 rounded-2xl bg-[#080b0a]/90 backdrop-blur-2xl border border-amber-200/40 shadow-[0_20px_50px_rgba(0,0,0,0.85)] text-white">
-      <h1 className="font-display text-xl font-bold tracking-tight text-amber-50 text-center">Reset password</h1>
-      {children}
-    </div>
-  );
-
   if (status === "checking") {
     return <Card><p className="mt-4 text-center text-xs text-neutral-400">Verifying your reset link…</p></Card>;
   }
@@ -99,7 +101,7 @@ export function ResetForm() {
             router.replace("/login");
             router.refresh();
           }}
-          className="mt-4 w-full rounded-lg bg-gradient-to-r from-amber-500 via-amber-400 to-amber-500 hover:from-amber-400 hover:to-amber-300 text-black font-semibold py-2.5 px-4 text-sm shadow-lg shadow-amber-500/25 transition-all"
+          className="mt-4 w-full rounded-lg bg-linear-to-r from-amber-500 via-amber-400 to-amber-500 hover:from-amber-400 hover:to-amber-300 text-black font-semibold py-2.5 px-4 text-sm shadow-lg shadow-amber-500/25 transition-all"
         >
           Go to sign in
         </button>
@@ -154,7 +156,7 @@ export function ResetForm() {
         <button
           type="submit"
           disabled={busy}
-          className="w-full rounded-lg bg-gradient-to-r from-amber-500 via-amber-400 to-amber-500 hover:from-amber-400 hover:to-amber-300 text-black font-semibold py-2.5 px-4 text-sm shadow-lg shadow-amber-500/25 transition-all disabled:opacity-50 mt-2"
+          className="w-full rounded-lg bg-linear-to-r from-amber-500 via-amber-400 to-amber-500 hover:from-amber-400 hover:to-amber-300 text-black font-semibold py-2.5 px-4 text-sm shadow-lg shadow-amber-500/25 transition-all disabled:opacity-50 mt-2"
         >
           {busy ? "Updating…" : "Update password"}
         </button>
